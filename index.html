@@ -3,21 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Árvores Viewer 2.0</title>
+    <title>AR Árvores Viewer 3.1 (Fix Script)</title>
 
-    <!-- A-Frame (Framework 3D) -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <!-- AR.js (Realidade Aumentada para Web) -->
-    <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nst.js'></script>
-    <!-- JSZip (Para abrir o KMZ) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Configuração de Erros Global (Para pegar erros de script externos) -->
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            var string = msg.toLowerCase();
+            var substring = "script error";
+            var message = "";
+            if (string.indexOf(substring) > -1){
+                message = 'Script Error: Verifique conexão ou permissões (CORS).';
+            } else {
+                message = msg;
+            }
+            
+            // Tenta exibir na div de log se ela existir, senão alerta
+            var logElem = document.getElementById('console-log');
+            if (logElem) {
+                logElem.innerText = "ERRO CRÍTICO: " + message;
+                logElem.classList.add('error-log');
+            } else {
+                console.error(message);
+            }
+            return false;
+        };
+    </script>
+
+    <!-- A-Frame 1.3.0 -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
+    <!-- AR.js Standard -->
+    <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js' crossorigin="anonymous"></script>
+    <!-- JSZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
 
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #000;
+            font-family: sans-serif;
+            background-color: #222; /* Fundo escuro inicial */
         }
 
         /* UI de Overlay */
@@ -32,192 +56,226 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: rgba(0,0,0,0.8); /* Fundo escuro inicial */
-            transition: opacity 0.5s;
+            background: rgba(0,0,0,0.85);
+            transition: opacity 0.3s;
+            pointer-events: auto;
         }
 
-        /* Quando a AR começa, o fundo fica transparente e painel vai pra baixo */
+        /* Modo AR Ativo */
         body.ar-active #ui-layer {
             background: transparent;
             justify-content: flex-end;
-            padding-bottom: 20px;
+            padding-bottom: 30px;
             pointer-events: none;
         }
         
         body.ar-active .panel {
             pointer-events: auto;
-            margin-bottom: 20px;
         }
 
-        /* Painel de Controle */
+        /* Painel central */
         .panel {
-            background: rgba(255, 255, 255, 0.95);
+            background: white;
             padding: 25px;
-            border-radius: 15px;
+            border-radius: 16px;
             text-align: center;
             width: 85%;
-            max-width: 400px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            max-width: 350px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
         .hidden { display: none !important; }
 
-        h1 { margin: 0 0 10px 0; font-size: 20px; color: #2c3e50; }
-        p { margin: 0 0 15px 0; font-size: 14px; color: #666; line-height: 1.5; }
+        h2 { margin-top: 0; color: #2c3e50; }
 
-        .btn {
-            background: #27ae60;
+        button {
+            background: #2ecc71;
             color: white;
             border: none;
-            padding: 15px 20px;
-            border-radius: 50px;
-            font-weight: bold;
-            cursor: pointer;
+            padding: 14px 24px;
+            border-radius: 8px;
             font-size: 16px;
+            font-weight: bold;
+            margin-top: 15px;
             width: 100%;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.1s;
         }
-        .btn:active { transform: scale(0.98); }
-
-        .btn-blue { background: #2980b9; }
-        .btn-red { background: #c0392b; }
-
-        /* Input de arquivo escondido */
-        #fileInput { display: none; }
-
-        /* Info de Depuração no topo */
-        #debug-info {
+        button:active { transform: scale(0.98); }
+        
+        /* Console de Log */
+        #console-log {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            color: #0f0;
-            padding: 8px;
+            background: rgba(0,0,0,0.8);
+            color: #00ff00;
             font-family: monospace;
             font-size: 11px;
-            z-index: 9998;
-            text-align: center;
+            padding: 8px;
             pointer-events: none;
+            z-index: 10000;
+            max-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            box-sizing: border-box;
         }
+        .error-log { color: #ff4444 !important; font-weight: bold; background: rgba(50,0,0,0.9) !important; }
 
-        .status-error { color: #ff5252 !important; font-weight: bold; }
-        .status-ok { color: #69f0ae !important; }
+        /* Container onde a cena será injetada */
+        #ar-scene-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
 
-    <div id="debug-info">Sistema pronto. Aguardando início.</div>
+    <!-- Log no Topo -->
+    <div id="console-log">Sistema pronto. Toque em INICIAR.</div>
 
+    <!-- Interface (Camada Superior) -->
     <div id="ui-layer">
         
-        <!-- Tela 1: Início / Solicitar Permissão -->
-        <div id="start-screen" class="panel">
-            <h1>🌳 Visualizador AR</h1>
-            <p>Para ver as árvores, precisamos acessar sua <b>Câmera</b> e <b>GPS</b>.</p>
-            <p id="https-warning" class="status-error hidden">⚠️ ALERTA: Site não seguro (HTTP). O GPS não funcionará. Use HTTPS ou Localhost.</p>
-            <button class="btn btn-blue" onclick="startApp()">📍 Permitir GPS e Câmera</button>
+        <!-- Passo 1: Permissões -->
+        <div id="step-1" class="panel">
+            <h2>🌲 AR Árvores</h2>
+            <p>Para evitar erros, precisamos ativar Câmera e GPS manualmente.</p>
+            <button onclick="initPermissions()">INICIAR SISTEMA</button>
         </div>
 
-        <!-- Tela 2: Carregar Arquivo (aparece depois do GPS ok) -->
-        <div id="upload-screen" class="panel hidden">
-            <h1>Carregar Mapa</h1>
-            <p>GPS Ativo! Agora selecione seu arquivo .KMZ</p>
-            
-            <button class="btn" onclick="document.getElementById('fileInput').click()">📂 Selecionar KMZ</button>
-            <input type="file" id="fileInput" accept=".kmz,.kml">
-            
-            <div id="loading-msg" style="display:none; color:#27ae60; margin-top:10px; font-weight:bold;">Processando...</div>
+        <!-- Passo 2: Upload -->
+        <div id="step-2" class="panel hidden">
+            <h3>Carregar Mapa</h3>
+            <p>Permissões OK! Selecione o arquivo.</p>
+            <button onclick="document.getElementById('fileInput').click()">📂 Abrir KMZ</button>
+            <input type="file" id="fileInput" accept=".kmz,.kml" style="display:none">
         </div>
 
-        <!-- Controles In-Game -->
-        <div id="game-controls" class="panel hidden" style="padding: 15px;">
-            <p style="margin:0; font-size:12px;">Aponte para o horizonte.</p>
-            <button class="btn btn-secondary" style="font-size:12px; padding:8px; margin-top:5px;" onclick="toggleSimulate()">🌲 Criar Árvore Teste (Aqui)</button>
+        <!-- Passo 3: Controles -->
+        <div id="step-3" class="panel hidden">
+            <p style="margin:0; font-size:12px; color:#333">Aponte para o horizonte.</p>
+            <button style="background:#34495e; margin-top:5px; font-size:12px" onclick="addTestTree()">🌲 Teste (Criar aqui)</button>
         </div>
     </div>
 
-    <!-- Cena AR -->
-    <a-scene
-        embedded
-        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;"
-        renderer="logarithmicDepthBuffer: true;"
-        vr-mode-ui="enabled: false"
-    >
-        <a-camera 
-            id="camera-rig"
-            gps-camera="minDistance: 0; maxDistance: 5000; simulateLatitude: 0; simulateLongitude: 0;" 
-            rotation-reader
-        ></a-camera>
-
-        <a-entity id="tree-container"></a-entity>
-    </a-scene>
+    <!-- Container Vazio para a Cena (A cena será injetada aqui via JS) -->
+    <div id="ar-scene-container"></div>
 
     <script>
-        const debugInfo = document.getElementById('debug-info');
-        const treeContainer = document.getElementById('tree-container');
-        
-        // Verificar HTTPS ao carregar
-        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')) {
-            document.getElementById('https-warning').classList.remove('hidden');
-            debugInfo.innerText = "ERRO CRÍTICO: Site não seguro (HTTP).";
-            debugInfo.classList.add('status-error');
-        }
-
-        // 1. Função chamada pelo botão inicial
-        function startApp() {
-            debugInfo.innerText = "Solicitando permissão de GPS...";
+        // Função de Log
+        function log(msg, isError = false) {
+            const el = document.getElementById('console-log');
+            // Adiciona nova linha sem apagar anterior (log histórico)
+            // el.innerText = msg; 
+            // Melhor: Apenas a última mensagem importante ou append se for debug
+            el.innerText = msg; 
             
-            if (!navigator.geolocation) {
-                alert("Seu navegador não suporta Geolocalização.");
-                return;
-            }
-
-            // Força o pedido de permissão explicitamente antes do AR.js tentar
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    // Sucesso!
-                    debugInfo.innerText = `GPS OK! Precisão: ${position.coords.accuracy}m`;
-                    debugInfo.classList.add('status-ok');
-                    
-                    // Troca as telas
-                    document.getElementById('start-screen').classList.add('hidden');
-                    document.getElementById('upload-screen').classList.remove('hidden');
-                    
-                    // Ativa classe no body para ajustar layout
-                    document.body.classList.add('ar-active');
-                },
-                (error) => {
-                    // Erro
-                    let msg = "Erro desconhecido.";
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED: msg = "Permissão negada pelo usuário."; break;
-                        case error.POSITION_UNAVAILABLE: msg = "Sinal de GPS indisponível."; break;
-                        case error.TIMEOUT: msg = "Tempo esgotado ao buscar GPS."; break;
-                    }
-                    debugInfo.innerText = "ERRO GPS: " + msg;
-                    debugInfo.classList.add('status-error');
-                    alert("Erro: " + msg + "\nVerifique se a Localização está ativa no Android e se o site tem permissão.");
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }
-            );
+            if(isError) el.classList.add('error-log');
+            else el.classList.remove('error-log');
+            console.log(msg);
         }
 
-        // Listener do Arquivo
+        // Variável para guardar as árvores temporariamente até a cena existir
+        let pendingTrees = [];
+
+        // 1. Solicitar Permissões
+        async function initPermissions() {
+            log("Solicitando acesso...");
+            
+            try {
+                // Pede Câmera
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                stream.getTracks().forEach(track => track.stop()); // Para o stream para o AR.js assumir
+                
+                log("Câmera OK. Buscando GPS...");
+
+                // Pede GPS
+                if (!navigator.geolocation) throw new Error("GPS não suportado.");
+                
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        log(`GPS OK! Precisão: ${Math.round(pos.coords.accuracy)}m`);
+                        
+                        // SUCESSO: Agora sim carregamos a cena AR
+                        injectARScene();
+
+                        // Atualiza UI
+                        document.getElementById('step-1').classList.add('hidden');
+                        document.getElementById('step-2').classList.remove('hidden');
+                        document.body.classList.add('ar-active');
+                    },
+                    (err) => {
+                        handleGPSError(err);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+
+            } catch (err) {
+                log("ERRO PERMISSÃO: " + err.name, true);
+                alert("Erro: " + err.name + "\nVerifique permissões do navegador.");
+            }
+        }
+
+        function handleGPSError(err) {
+            let erroMsg = "Erro GPS: ";
+            if(err.code === 1) erroMsg += "Negado pelo usuário.";
+            else if(err.code === 2) erroMsg += "Sinal indisponível.";
+            else if(err.code === 3) erroMsg += "Tempo esgotado.";
+            log(erroMsg, true);
+        }
+
+        // INJEÇÃO DINÂMICA DA CENA
+        // Isso evita que o AR.js tente rodar antes das permissões existirem
+        function injectARScene() {
+            const container = document.getElementById('ar-scene-container');
+            container.innerHTML = `
+                <a-scene
+                    embedded
+                    vr-mode-ui="enabled: false"
+                    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+                    renderer="logarithmicDepthBuffer: true; alpha: true;"
+                >
+                    <a-camera 
+                        id="camera"
+                        gps-camera="minDistance: 0; maxDistance: 5000;" 
+                        rotation-reader
+                    ></a-camera>
+                    
+                    <a-entity id="tree-container"></a-entity>
+                </a-scene>
+            `;
+            
+            log("Sistema AR Inicializado.");
+            
+            // Monitorar GPS da Câmera para Log
+            // Pequeno delay para esperar o elemento existir no DOM
+            setTimeout(() => {
+                const cam = document.querySelector('[gps-camera]');
+                if(cam) {
+                    cam.addEventListener('gps-camera-update-position', e => {
+                        if(!document.getElementById('console-log').classList.contains('error-log')) {
+                            const lat = e.detail.position.latitude.toFixed(5);
+                            const lon = e.detail.position.longitude.toFixed(5);
+                            const arvores = document.getElementById('tree-container')?.children.length || 0;
+                            log(`GPS: ${lat}, ${lon} | Árvores: ${arvores}`);
+                        }
+                    });
+                }
+            }, 1000);
+        }
+
+        // 2. Carregar Arquivo
         document.getElementById('fileInput').addEventListener('change', async (evt) => {
             const file = evt.target.files[0];
             if (!file) return;
 
-            document.getElementById('loading-msg').style.display = 'block';
-
+            log("Processando arquivo...");
             try {
                 let kmlText = "";
                 if (file.name.toLowerCase().endsWith('.kmz')) {
@@ -225,6 +283,7 @@
                     const zipContent = await zip.loadAsync(file);
                     const kmlFile = Object.keys(zipContent.files).find(n => n.toLowerCase().endsWith('.kml'));
                     if (kmlFile) kmlText = await zipContent.files[kmlFile].async("string");
+                    else throw new Error("KMZ sem KML.");
                 } else {
                     const reader = new FileReader();
                     reader.readAsText(file);
@@ -232,63 +291,76 @@
                     kmlText = reader.result;
                 }
 
-                parseKML(kmlText);
+                processKML(kmlText);
                 
-                // Esconde upload e mostra jogo
-                document.getElementById('upload-screen').classList.add('hidden');
-                document.getElementById('game-controls').classList.remove('hidden');
-
+                document.getElementById('step-2').classList.add('hidden');
+                document.getElementById('step-3').classList.remove('hidden');
+                
             } catch (err) {
-                alert("Erro ao ler arquivo: " + err.message);
-            } finally {
-                document.getElementById('loading-msg').style.display = 'none';
+                log("Erro Arquivo: " + err.message, true);
             }
         });
 
-        function parseKML(xml) {
+        function processKML(xml) {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xml, "text/xml");
             const placemarks = xmlDoc.getElementsByTagName("Placemark");
-            let count = 0;
+            
+            // Espera container estar pronto
+            const container = document.getElementById('tree-container');
+            if(!container) {
+                log("Erro: Cena AR não pronta.", true);
+                return;
+            }
 
+            let count = 0;
             for (let p of placemarks) {
                 const coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
                 const name = p.getElementsByTagName("name")[0]?.textContent || "Árvore";
+                
                 if (coords) {
-                    const [lon, lat] = coords.split(',').map(parseFloat);
-                    addTree(lat, lon, name);
+                    const parts = coords.split(',');
+                    const lon = parseFloat(parts[0]);
+                    const lat = parseFloat(parts[1]);
+                    createEntity(lat, lon, name, container);
                     count++;
                 }
             }
-            alert(`${count} árvores carregadas!`);
+            log(`${count} árvores carregadas!`);
         }
 
-        function addTree(lat, lon, name) {
+        function createEntity(lat, lon, name, parent) {
             const el = document.createElement('a-entity');
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+            el.setAttribute('scale', '2 2 2'); // Escala base
+            
+            // Layout visual da árvore
             el.innerHTML = `
-                <a-entity scale="2 2 2" position="0 0 0">
-                    <a-text value="${name}" align="center" color="yellow" position="0 4 0" side="double" look-at="[gps-camera]"></a-text>
-                    <a-cone color="#2ecc71" position="0 2 0" radius-bottom="1" radius-top="0" height="3"></a-cone>
-                    <a-cylinder color="#5d4037" position="0 0.5 0" radius="0.3" height="1"></a-cylinder>
-                </a-entity>
+                <a-text value="${name}" align="center" color="#f1c40f" position="0 4 0" side="double" look-at="[gps-camera]" scale="2 2 2"></a-text>
+                <a-cone color="#2ecc71" position="0 2 0" radius-bottom="1" radius-top="0" height="3"></a-cone>
+                <a-cylinder color="#5d4037" position="0 0.5 0" radius="0.3" height="1"></a-cylinder>
             `;
-            treeContainer.appendChild(el);
+            parent.appendChild(el);
         }
 
-        function toggleSimulate() {
+        function addTestTree() {
             navigator.geolocation.getCurrentPosition((pos) => {
-                addTree(pos.coords.latitude + 0.0002, pos.coords.longitude, "Teste Norte");
-                alert("Árvore criada ao Norte.");
+                const container = document.getElementById('tree-container');
+                if(container) {
+                    const lat = pos.coords.latitude + 0.0002; // ~20m Norte
+                    const lon = pos.coords.longitude;
+                    
+                    const el = document.createElement('a-entity');
+                    el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+                    el.innerHTML = `
+                        <a-text value="TESTE" align="center" color="red" position="0 4 0" side="double" look-at="[gps-camera]"></a-text>
+                        <a-box color="red" position="0 2 0" scale="2 2 2"></a-box>
+                    `;
+                    container.appendChild(el);
+                    log("Árvore Teste criada ao Norte.");
+                }
             });
         }
-
-        // Atualizador de Status AR.js
-        window.addEventListener('gps-camera-update-position', e => {
-            const d = Math.round(e.detail.position.latitude * 1000) / 1000;
-            debugInfo.innerText = `GPS Ativo | Lat: ${d}... | Árvores: ${treeContainer.children.length}`;
-            debugInfo.classList.add('status-ok');
-        });
     </script>
 </body>
 </html>
