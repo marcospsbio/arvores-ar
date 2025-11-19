@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Árvores - Navegação GPS</title>
+    <title>AR Guia & Radar</title>
 
-    <!-- Scripts de Tratamento de Erro -->
     <script>
         window.onerror = function(msg) {
             var logElem = document.getElementById('console-log');
@@ -13,7 +12,6 @@
         };
     </script>
 
-    <!-- Bibliotecas AR -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
     <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js' crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
@@ -21,125 +19,114 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #222; }
         
-        /* --- UI CAMADAS --- */
         #console-log {
-            position: fixed; top: 0; left: 50px; right: 0;
+            position: fixed; top: 0; left: 0; width: 100%;
             background: rgba(0,0,0,0.5); color: #00ff00;
             font-family: monospace; font-size: 10px; padding: 2px;
-            z-index: 9990; pointer-events: none; text-align: center; white-space: nowrap; overflow: hidden;
+            z-index: 9990; pointer-events: none; text-align: center;
         }
 
-        /* Tela Inicial */
+        /* --- UI RADAR --- */
+        #radar-container {
+            position: fixed; top: 10px; right: 10px;
+            width: 120px; height: 120px;
+            background: rgba(0, 20, 0, 0.8);
+            border: 2px solid #444; border-radius: 50%;
+            z-index: 9995; display: none; /* Escondido até carregar */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #radar-center {
+            position: absolute; top: 50%; left: 50%;
+            width: 8px; height: 8px; background: #00ff00;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            box-shadow: 0 0 5px #00ff00;
+        }
+        .radar-dot {
+            position: absolute; width: 6px; height: 6px;
+            background: yellow; border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .radar-dot.target { background: red; width: 8px; height: 8px; z-index: 2; border: 1px solid white; }
+
+        /* --- UI MENUS --- */
+        #menu-btn {
+            position: fixed; top: 10px; left: 10px; z-index: 9995;
+            background: white; border: none; border-radius: 5px;
+            width: 40px; height: 40px; font-size: 24px; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: none;
+        }
+
+        #sidebar {
+            position: fixed; top: 0; left: -320px; width: 280px; height: 100%;
+            background: rgba(255, 255, 255, 0.98); z-index: 9996;
+            transition: left 0.3s ease; box-shadow: 2px 0 15px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column;
+        }
+        #sidebar.open { left: 0; }
+        
+        .sidebar-header { padding: 15px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; }
+        #tree-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        .list-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; }
+        .list-item:hover { background: #f0f0f0; }
+        .list-item.selected { background: #d5f5e3; border-left: 5px solid #27ae60; }
+
+        /* --- HUD INFERIOR --- */
+        #nav-info {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
+            border-radius: 30px; z-index: 9995; text-align: center;
+            display: none; min-width: 200px; border: 2px solid #f1c40f;
+        }
+        .btn-stop { background: #c0392b; border: none; color: white; padding: 5px 15px; border-radius: 15px; margin-top: 5px; font-size: 12px; cursor: pointer; }
+
+        /* --- TELA INICIAL --- */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10000; background: rgba(0,0,0,0.9);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
-
-        /* Botão Menu Hamburguer */
-        #menu-btn {
-            position: fixed; top: 10px; left: 10px; z-index: 9995;
-            background: white; border: none; border-radius: 5px;
-            width: 40px; height: 40px; font-size: 24px; cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: none; /* Escondido até iniciar */
-        }
-
-        /* Menu Lateral Retrátil */
-        #sidebar {
-            position: fixed; top: 0; left: -300px; width: 280px; height: 100%;
-            background: rgba(255, 255, 255, 0.95); z-index: 9996;
-            transition: left 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.5);
-            display: flex; flex-direction: column;
-        }
-        #sidebar.open { left: 0; }
-        
-        .sidebar-header {
-            padding: 15px; background: #2c3e50; color: white;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .close-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
-        
-        #tree-list {
-            list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1;
-        }
-        .list-item {
-            padding: 15px; border-bottom: 1px solid #eee; cursor: pointer;
-            display: flex; justify-content: space-between;
-        }
-        .list-item:hover { background: #f0f0f0; }
-        .list-item small { color: #666; }
-        .list-item.selected { background: #d5f5e3; border-left: 5px solid #27ae60; }
-
-        /* HUD da Seta de Navegação */
-        #nav-hud {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 9992; text-align: center; display: none; pointer-events: none;
-        }
-        
-        /* Círculo da seta */
-        .arrow-circle {
-            width: 80px; height: 80px; background: rgba(0,0,0,0.6);
-            border-radius: 50%; border: 2px solid white;
-            display: flex; justify-content: center; align-items: center;
-            margin: 0 auto 10px auto;
-            transition: transform 0.1s linear; /* Suaviza rotação */
-        }
-        
-        .arrow-icon {
-            font-size: 40px; color: #00ff00; font-weight: bold;
-        }
-
-        .nav-info {
-            background: rgba(0,0,0,0.7); color: white; padding: 8px 15px;
-            border-radius: 20px; font-size: 14px; text-shadow: 1px 1px 2px black;
-        }
-
-        /* Estilos Gerais */
-        .panel { background: white; padding: 20px; border-radius: 10px; text-align: center; width: 80%; max-width: 300px; }
-        .btn { background: #27ae60; color: white; border: none; padding: 12px; border-radius: 5px; width: 100%; margin-top: 10px; font-size: 16px; }
+        .panel { background: white; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; }
+        .btn { background: #27ae60; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; margin-top: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
         .hidden { display: none !important; }
+
     </style>
 </head>
 <body>
 
-    <!-- Botão Menu -->
-    <button id="menu-btn" onclick="toggleSidebar()">☰</button>
+    <!-- Radar -->
+    <div id="radar-container">
+        <div id="radar-center"></div>
+        <!-- Pontos serão injetados via JS -->
+    </div>
 
-    <!-- Menu Lateral -->
+    <!-- Menu -->
+    <button id="menu-btn" onclick="toggleSidebar()">☰</button>
     <div id="sidebar">
         <div class="sidebar-header">
-            <span>📍 Pontos (<span id="count-display">0</span>)</span>
-            <button class="close-btn" onclick="toggleSidebar()">×</button>
+            <span>📍 Árvores Próximas</span>
+            <button onclick="toggleSidebar()" style="background:none;border:none;color:white;font-size:20px;">✕</button>
         </div>
-        <ul id="tree-list">
-            <li style="padding:20px; text-align:center; color:#999;">Carregue um mapa primeiro.</li>
-        </ul>
+        <ul id="tree-list"><li style="padding:20px;text-align:center;color:#888">Carregue o KMZ...</li></ul>
     </div>
 
-    <!-- HUD de Navegação (Seta) -->
-    <div id="nav-hud">
-        <div class="arrow-circle" id="arrow-dial">
-            <div class="arrow-icon">⬆</div>
-        </div>
-        <div class="nav-info">
-            <strong id="target-name">Selecionar Destino</strong><br>
-            <span id="target-dist">-- m</span>
-        </div>
-        <button onclick="stopNavigation()" style="pointer-events:auto; background:#c0392b; border:none; color:white; padding:5px 10px; border-radius:15px; margin-top:5px; font-size:12px;">Parar</button>
+    <!-- Info Navegação -->
+    <div id="nav-info">
+        <strong id="target-name" style="font-size: 18px; color: #f1c40f;">Destino</strong><br>
+        <span id="target-dist" style="font-size: 24px; font-weight: bold;">-- m</span><br>
+        <span style="font-size: 12px; color: #ccc;">Siga a linha amarela</span><br>
+        <button class="btn-stop" onclick="stopNavigation()">Parar Guia</button>
     </div>
 
-    <!-- Logs -->
     <div id="console-log">Aguardando...</div>
 
-    <!-- Tela Inicial -->
+    <!-- Telas -->
     <div id="start-screen">
-        <div class="panel" id="panel-permission">
-            <h2>🧭 AR Navigator</h2>
-            <p>Precisamos de GPS e Orientação.</p>
+        <div class="panel" id="panel-perm">
+            <h2>🌲 AR Explorer</h2>
+            <p>Ative GPS e Câmera para começar.</p>
             <button class="btn" onclick="startApp()">INICIAR</button>
         </div>
-        
-        <div class="panel hidden" id="panel-upload">
+        <div class="panel hidden" id="panel-file">
             <h3>Carregar Mapa</h3>
             <button class="btn" onclick="document.getElementById('fileInput').click()">📂 Abrir KMZ</button>
             <input type="file" id="fileInput" accept=".kmz,.kml" style="display:none">
@@ -148,27 +135,26 @@
         </div>
     </div>
 
-    <!-- Cena AR -->
+    <!-- Cena 3D -->
     <div id="scene-wrapper"></div>
 
     <script>
         const log = (msg) => document.getElementById('console-log').innerText = msg;
         
-        // Estado Global
-        let treeEntities = []; // {id, lat, lon, name, el, dist}
-        let currentTarget = null; // Árvore selecionada
-        let userHeading = 0; // Bússola do celular (0-360)
-        let userLat = 0;
-        let userLon = 0;
+        // --- ESTADO GLOBAL ---
+        let treeEntities = [];
+        let currentTargetId = null;
+        let userLat = 0, userLon = 0, userHeading = 0;
+        
+        // Linha Guia (Elemento A-Frame)
+        let guideLineEl = null;
 
-        // --- 1. Inicialização ---
+        // --- 1. STARTUP ---
         async function startApp() {
             try {
-                // Hack permissão vídeo Chrome
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 stream.getTracks().forEach(t => t.stop());
                 
-                // Permissão Orientação (Importante para iOS 13+)
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     await DeviceOrientationEvent.requestPermission();
                 }
@@ -176,25 +162,24 @@
                 if(!navigator.geolocation) throw new Error("Sem GPS");
 
                 navigator.geolocation.getCurrentPosition(pos => {
-                    userLat = pos.coords.latitude;
-                    userLon = pos.coords.longitude;
-                    
                     injectScene();
+                    document.getElementById('panel-perm').classList.add('hidden');
+                    document.getElementById('panel-file').classList.remove('hidden');
                     
-                    document.getElementById('panel-permission').classList.add('hidden');
-                    document.getElementById('panel-upload').classList.remove('hidden');
+                    // Listeners
+                    window.addEventListener('deviceorientation', e => {
+                        if(e.webkitCompassHeading) userHeading = e.webkitCompassHeading;
+                        else if(e.alpha) userHeading = e.alpha;
+                    });
                     
-                    // Iniciar Loops
-                    window.addEventListener('deviceorientation', handleOrientation);
-                    setInterval(updateLoop, 1000); // Atualiza distâncias a cada 1s
-                    setInterval(updateArrowUI, 100); // Atualiza seta suavemente
-                    
-                    log("GPS OK. Carregue o KMZ.");
+                    // Loops
+                    setInterval(updateGameLoop, 1000); // GPS e Distâncias (Lento)
+                    setInterval(updateVisuals, 50);   // Radar e Linha (Rápido)
+
+                    log("GPS OK. Pronto para carregar.");
                 }, err => alert("Erro GPS: " + err.message));
 
-            } catch(e) {
-                alert("Erro: " + e.message);
-            }
+            } catch(e) { alert(e.message); }
         }
 
         function injectScene() {
@@ -202,32 +187,37 @@
             wrapper.innerHTML = `
                 <a-scene embedded vr-mode-ui="enabled: false" arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
                     <a-camera id="cam" gps-camera="minDistance: 5; maxDistance: 5000;" rotation-reader></a-camera>
+                    
+                    <!-- Container das Árvores -->
                     <a-entity id="tree-container"></a-entity>
+                    
+                    <!-- Linha Guia (Dinâmica) -->
+                    <a-entity id="guide-line" line="start: 0 -1 0; end: 0 -1 -5; color: #f1c40f; opacity: 0.8" visible="false"></a-entity>
                 </a-scene>
             `;
+            // Espera carregar para pegar referencia da linha
+            setTimeout(() => {
+                guideLineEl = document.getElementById('guide-line');
+            }, 1000);
         }
 
-        // --- 2. Manipulação de Arquivo ---
+        // --- 2. ARQUIVO E PARSE ---
         document.getElementById('fileInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if(!file) return;
-            
             try {
                 const zip = new JSZip();
                 const content = await zip.loadAsync(file);
                 const kmlName = Object.keys(content.files).find(n => n.toLowerCase().endsWith('.kml'));
                 const kmlText = await content.files[kmlName].async("string");
-                
                 parseKML(kmlText);
                 
-                // UI Changes
+                // UI Updates
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('menu-btn').style.display = 'block';
-                toggleSidebar(); // Abre a lista automaticamente para mostrar que carregou
-                
-            } catch(err) {
-                alert("Erro Arquivo: " + err.message);
-            }
+                document.getElementById('radar-container').style.display = 'block';
+                toggleSidebar();
+            } catch(err) { alert("Erro no arquivo."); }
         });
 
         function parseKML(xml) {
@@ -236,191 +226,235 @@
             const placemarks = xmlDoc.getElementsByTagName("Placemark");
             const container = document.getElementById('tree-container');
             
-            treeEntities = []; // Limpa lista anterior
-            container.innerHTML = ''; // Limpa cena
+            treeEntities = [];
+            container.innerHTML = '';
             
             let count = 0;
             for(let p of placemarks) {
                 const coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
-                const name = p.getElementsByTagName("name")[0]?.textContent || "Árvore " + (count+1);
+                const name = p.getElementsByTagName("name")[0]?.textContent || `Árvore ${count+1}`;
                 
                 if(coords) {
                     const [lon, lat] = coords.split(',').map(parseFloat);
                     
-                    // Cria Elemento 3D
+                    // Visual 3D
                     const el = document.createElement('a-entity');
                     el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-                    el.setAttribute('scale', '2 2 2');
+                    
+                    // Cria a árvore visual
                     el.innerHTML = `
-                        <a-text value="${name}" align="center" color="yellow" position="0 4 0" look-at="[gps-camera]" scale="3 3 3"></a-text>
-                        <a-cone color="#2ecc71" position="0 2 0" height="3"></a-cone>
+                        <a-entity position="0 0 0" scale="2 2 2" class="tree-model">
+                            <a-text value="${name}" align="center" color="#FFF" position="0 5 0" look-at="[gps-camera]" scale="4 4 4"></a-text>
+                            <a-cone color="#2ecc71" position="0 2 0" height="4" radius-bottom="1.5"></a-cone>
+                            <a-cylinder color="#5d4037" position="0 0.5 0" radius="0.4" height="1"></a-cylinder>
+                        </a-entity>
                     `;
                     container.appendChild(el);
 
-                    // Salva dados
                     treeEntities.push({
-                        id: count,
-                        name: name,
-                        lat: lat,
-                        lon: lon,
-                        el: el,
-                        dist: 99999 // Inicial
+                        id: count, name: name, lat: lat, lon: lon, el: el, 
+                        dist: 9999,
+                        radarDot: createRadarDot() // Cria pontinho no radar
                     });
                     count++;
                 }
             }
-            
-            document.getElementById('count-display').innerText = count;
-            updateListUI();
+            updateList();
         }
 
-        // --- 3. Lógica de Lista e Navegação ---
+        // --- 3. NAVEGAÇÃO E LÓGICA ---
         
-        function updateListUI() {
-            const list = document.getElementById('tree-list');
-            list.innerHTML = '';
-            
-            // Ordena por distância (Opcional, mas útil)
-            const sortedTrees = [...treeEntities].sort((a, b) => a.dist - b.dist);
-
-            sortedTrees.forEach(tree => {
-                const li = document.createElement('li');
-                li.className = 'list-item';
-                if(currentTarget && currentTarget.id === tree.id) li.classList.add('selected');
-                
-                li.innerHTML = `<span>${tree.name}</span> <small>${tree.dist < 9999 ? tree.dist.toFixed(0) + 'm' : '...'}</small>`;
-                li.onclick = () => selectTarget(tree.id);
-                list.appendChild(li);
-            });
-        }
-
         function selectTarget(id) {
-            // Encontra a árvore original pelo ID
+            currentTargetId = id;
             const tree = treeEntities.find(t => t.id === id);
-            if(tree) {
-                currentTarget = tree;
-                document.getElementById('nav-hud').style.display = 'block';
-                document.getElementById('target-name').innerText = tree.name;
-                toggleSidebar(); // Fecha menu
-                updateListUI(); // Atualiza destaque na lista
-            }
+            
+            // UI HUD
+            document.getElementById('nav-info').style.display = 'block';
+            document.getElementById('target-name').innerText = tree.name;
+            
+            // Ativa Linha
+            if(guideLineEl) guideLineEl.setAttribute('visible', 'true');
+            
+            toggleSidebar();
+            updateList();
         }
 
         function stopNavigation() {
-            currentTarget = null;
-            document.getElementById('nav-hud').style.display = 'none';
-            updateListUI();
+            currentTargetId = null;
+            document.getElementById('nav-info').style.display = 'none';
+            if(guideLineEl) guideLineEl.setAttribute('visible', 'false');
+            updateList();
+        }
+
+        // --- LOOPS ---
+
+        // Loop 1: Lento (GPS e Distâncias)
+        function updateGameLoop() {
+            navigator.geolocation.getCurrentPosition(pos => {
+                userLat = pos.coords.latitude;
+                userLon = pos.coords.longitude;
+                
+                treeEntities.forEach(tree => {
+                    // Calcula dist
+                    tree.dist = haversine(userLat, userLon, tree.lat, tree.lon);
+                    
+                    // Cores por distância
+                    const model = tree.el.querySelector('.tree-model');
+                    const cone = tree.el.querySelector('a-cone');
+                    
+                    if(tree.dist < 50) {
+                        // Muito Perto: Verde e Gigante
+                        cone.setAttribute('color', '#00ff00');
+                        model.setAttribute('scale', '3 3 3'); 
+                    } else if (tree.dist < 200) {
+                        // Médio: Amarelo
+                        cone.setAttribute('color', 'yellow');
+                        model.setAttribute('scale', '2 2 2');
+                    } else {
+                        // Longe: Vermelho
+                        cone.setAttribute('color', '#c0392b');
+                        model.setAttribute('scale', '2 2 2');
+                    }
+
+                    // Garante visibilidade se < 500m
+                    tree.el.setAttribute('visible', tree.dist < 500);
+                });
+
+                // Atualiza HUD texto
+                if(currentTargetId !== null) {
+                    const target = treeEntities.find(t => t.id === currentTargetId);
+                    if(target) document.getElementById('target-dist').innerText = target.dist.toFixed(0) + " m";
+                }
+
+                // Atualiza números na lista (se aberta)
+                if(document.getElementById('sidebar').classList.contains('open')) updateList();
+
+            }, null, { enableHighAccuracy: true });
+        }
+
+        // Loop 2: Rápido (Visuais, Radar, Linha)
+        function updateVisuals() {
+            // A. Atualiza Radar
+            const radarRadius = 55; // px
+            const scanRange = 300; // Metros que o radar enxerga
+            
+            treeEntities.forEach(tree => {
+                if(!tree.radarDot) return;
+
+                // Se for o alvo selecionado, sempre mostra no radar (mesmo longe)
+                const isTarget = (tree.id === currentTargetId);
+                
+                if(tree.dist > scanRange && !isTarget) {
+                    tree.radarDot.style.display = 'none';
+                    return;
+                }
+                tree.radarDot.style.display = 'block';
+
+                // Lógica Radar: Delta Lat/Lon relativo ao heading
+                // 1. Pega ângulo até a árvore
+                const bearing = getBearing(userLat, userLon, tree.lat, tree.lon);
+                // 2. Relativo ao para onde estou olhando
+                let relAngle = bearing - userHeading; 
+                // Converte para rad
+                const relRad = (relAngle - 90) * (Math.PI / 180); // -90 para alinhar ao topo
+
+                // 3. Distância no radar (limitada à borda)
+                // Normaliza: 0 a 1 (onde 1 é scanRange)
+                let distRatio = tree.dist / scanRange;
+                if(distRatio > 1) distRatio = 1; // Clampa na borda
+                
+                const r = distRatio * radarRadius;
+                
+                const x = 60 + r * Math.cos(relRad); // 60 é centro do div 120px
+                const y = 60 + r * Math.sin(relRad);
+
+                tree.radarDot.style.left = x + 'px';
+                tree.radarDot.style.top = y + 'px';
+                
+                // Estiliza o ponto alvo
+                if(isTarget) {
+                    tree.radarDot.classList.add('target');
+                    tree.radarDot.style.background = 'red';
+                } else {
+                    tree.radarDot.classList.remove('target');
+                    tree.radarDot.style.background = tree.dist < 50 ? '#00ff00' : 'yellow';
+                }
+            });
+
+            // B. Atualiza Linha Guia (Faixa)
+            if(currentTargetId !== null && guideLineEl) {
+                const target = treeEntities.find(t => t.id === currentTargetId);
+                // Precisamos da posição do objeto A-Frame no mundo 3D
+                const obj3D = target.el.object3D;
+                
+                // A-Frame Position vector
+                const vec = obj3D.position;
+                
+                // Atualiza atributo 'line'
+                // Start: Pés do usuário (0, -1, 0)
+                // End: Posição da árvore
+                guideLineEl.setAttribute('line', `start: 0 -1 0; end: ${vec.x} ${vec.y} ${vec.z}; color: #f1c40f; opacity: 0.8`);
+            }
+        }
+
+        // --- UI AUXILIAR ---
+        function createRadarDot() {
+            const d = document.createElement('div');
+            d.className = 'radar-dot';
+            document.getElementById('radar-container').appendChild(d);
+            return d;
+        }
+
+        function updateList() {
+            const list = document.getElementById('tree-list');
+            // Só recria se o número de itens mudar ou for selecionado para evitar lag, 
+            // mas aqui vamos simplificar limpando e re-renderizando texto
+            list.innerHTML = '';
+            const sorted = [...treeEntities].sort((a,b) => a.dist - b.dist);
+            
+            sorted.forEach(t => {
+                const li = document.createElement('li');
+                li.className = `list-item ${t.id === currentTargetId ? 'selected' : ''}`;
+                li.innerHTML = `<span>${t.name}</span> <small>${t.dist.toFixed(0)}m</small>`;
+                li.onclick = () => selectTarget(t.id);
+                list.appendChild(li);
+            });
         }
 
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('open');
         }
 
-        // --- 4. Loops de Atualização ---
-
-        // Bússola do Celular
-        function handleOrientation(event) {
-            // alpha: rotação em torno do eixo z (0 a 360 graus)
-            // No Android, alpha 0 é Norte. No iOS precisa de webkitCompassHeading
-            if (event.webkitCompassHeading) {
-                userHeading = event.webkitCompassHeading;
-            } else {
-                userHeading = event.alpha; 
-            }
-        }
-
-        // Loop Lento (1s): GPS e Distâncias
-        function updateLoop() {
-            navigator.geolocation.getCurrentPosition(pos => {
-                userLat = pos.coords.latitude;
-                userLon = pos.coords.longitude;
-                
-                // Atualiza distâncias de todos
-                treeEntities.forEach(tree => {
-                    tree.dist = haversine(userLat, userLon, tree.lat, tree.lon);
-                    // Mostra/Esconde na cena 3D se tiver perto (<1km)
-                    tree.el.setAttribute('visible', tree.dist < 1000);
-                });
-
-                // Se o menu estiver aberto, atualiza os números lá
-                if(document.getElementById('sidebar').classList.contains('open')) {
-                    updateListUI();
-                }
-
-                // Atualiza texto da HUD
-                if(currentTarget) {
-                    const dist = currentTarget.dist;
-                    document.getElementById('target-dist').innerText = dist.toFixed(0) + " metros";
-                }
-                
-                log(`GPS: ${userLat.toFixed(5)} | Heading: ${Math.round(userHeading)}°`);
-
-            }, null, { enableHighAccuracy: true, maximumAge: 0 });
-        }
-
-        // Loop Rápido (100ms): Seta Direcional
-        function updateArrowUI() {
-            if(!currentTarget) return;
-
-            // 1. Calcula o ângulo do Norte até o Destino (Bearing)
-            const bearing = getBearing(userLat, userLon, currentTarget.lat, currentTarget.lon);
-            
-            // 2. Calcula a rotação da seta: (Onde é o destino) - (Onde estou olhando)
-            // Ajuste: A seta aponta para cima (0deg), então rotacionamos ela.
-            let arrowRot = bearing - userHeading;
-            
-            // Aplica rotação CSS
-            const dial = document.getElementById('arrow-dial');
-            dial.style.transform = `rotate(${arrowRot}deg)`;
-        }
-
-        // --- Matemáticas ---
-
-        function toRadians(degrees) { return degrees * Math.PI / 180; }
-        function toDegrees(radians) { return radians * 180 / Math.PI; }
+        // --- MATH UTILS ---
+        function toRad(d) { return d * Math.PI / 180; }
+        function toDeg(r) { return r * 180 / Math.PI; }
 
         function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; 
-            const φ1 = toRadians(lat1);
-            const φ2 = toRadians(lat2);
-            const Δφ = toRadians(lat2-lat1);
-            const Δλ = toRadians(lon2-lon1);
-
-            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                      Math.cos(φ1) * Math.cos(φ2) *
-                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const R = 6371e3;
+            const φ1 = toRad(lat1), φ2 = toRad(lat2);
+            const Δφ = toRad(lat2-lat1), Δλ = toRad(lon2-lon1);
+            const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function getBearing(startLat, startLng, destLat, destLng) {
-            startLat = toRadians(startLat);
-            startLng = toRadians(startLng);
-            destLat = toRadians(destLat);
-            destLng = toRadians(destLng);
-
-            y = Math.sin(destLng - startLng) * Math.cos(destLat);
-            x = Math.cos(startLat) * Math.sin(destLat) -
-                Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
-            brng = Math.atan2(y, x);
-            return (toDegrees(brng) + 360) % 360;
+        function getBearing(lat1, lon1, lat2, lon2) {
+            const y = Math.sin(toRad(lon2-lon1)) * Math.cos(toRad(lat2));
+            const x = Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) -
+                      Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
+            return (toDeg(Math.atan2(y, x)) + 360) % 360;
         }
-        
-        // Teste
+
         function addTestTree() {
-            // Adiciona árvore fake na lista
-            const fakeTree = {
-                id: 999,
-                name: "Árvore Teste",
-                lat: userLat + 0.0005, // Norte
-                lon: userLon,
-                el: document.createElement('a-entity'),
-                dist: 0
+            const fake = {
+                id: 999, name: "Teste", lat: userLat + 0.0003, lon: userLon, 
+                el: document.createElement('a-entity'), dist: 0, radarDot: createRadarDot()
             };
-            treeEntities.push(fakeTree);
-            updateListUI();
-            alert("Árvore Teste adicionada na lista!");
-            // Abre menu para user selecionar
-            if(!document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+            // Adiciona visual fake na cena
+            fake.el.setAttribute('gps-entity-place', `latitude: ${fake.lat}; longitude: ${fake.lon};`);
+            document.getElementById('tree-container').appendChild(fake);
+            treeEntities.push(fake);
+            alert("Árvore Teste adicionada!");
+            toggleSidebar();
         }
     </script>
 </body>
