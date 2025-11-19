@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Pro - Trilha & Radar</title>
+    <title>AR Pro Final</title>
 
     <script>
-        // Catch global errors
+        // Log simplificado
         window.onerror = function(msg) {
             var logElem = document.getElementById('console-log');
             if (logElem) logElem.innerText = "⚠️ " + msg;
@@ -17,568 +17,430 @@
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
     <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js' crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
-    <!-- Look-at component (Essential for text facing user) -->
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Roboto', 'Segoe UI', sans-serif; background-color: #111; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #000; }
         
-        /* --- LOG DEBUG --- */
         #console-log {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
-            color: #00ff00; font-family: monospace; font-size: 11px; padding: 5px;
-            z-index: 9990; pointer-events: none; text-align: center;
-            text-shadow: 1px 1px 1px black;
+            background: rgba(0,0,0,0.5); color: #0f0; font-size: 11px; 
+            pointer-events: none; z-index: 9999; text-align: center; padding: 4px;
         }
 
-        /* --- RADAR SONAR --- */
+        /* --- RADAR --- */
         #radar-container {
-            position: fixed; top: 15px; right: 15px;
-            width: 110px; height: 110px;
-            background: rgba(0, 15, 0, 0.6);
-            border: 2px solid rgba(0, 255, 0, 0.5);
-            border-radius: 50%;
-            z-index: 9995; display: none;
-            backdrop-filter: blur(4px);
-            box-shadow: 0 0 15px rgba(0,255,0,0.2);
-            background-image: 
-                radial-gradient(transparent 35%, rgba(0,255,0,0.3) 36%, transparent 37%),
-                linear-gradient(transparent 49%, rgba(0,255,0,0.2) 50%, transparent 51%),
-                linear-gradient(90deg, transparent 49%, rgba(0,255,0,0.2) 50%, transparent 51%);
+            position: fixed; top: 10px; right: 10px; width: 110px; height: 110px;
+            background: rgba(0, 20, 0, 0.7); border: 2px solid #0f0; border-radius: 50%;
+            z-index: 9990; display: none; overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,255,0,0.3);
         }
+        #radar-container::before, #radar-container::after {
+            content: ''; position: absolute; background: rgba(0, 255, 0, 0.2);
+        }
+        #radar-container::before { top: 50%; left: 0; width: 100%; height: 1px; }
+        #radar-container::after { top: 0; left: 50%; width: 1px; height: 100%; }
+        
         #radar-center {
-            position: absolute; top: 50%; left: 50%;
-            width: 0; height: 0;
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-bottom: 10px solid #00ff00; /* Seta indicando frente */
-            transform: translate(-50%, -50%);
-            filter: drop-shadow(0 0 2px #00ff00);
+            position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; 
+            background: #fff; transform: translate(-50%, -50%); border-radius: 50%; 
+            z-index: 2; box-shadow: 0 0 4px white;
         }
         .radar-dot {
-            position: absolute; width: 6px; height: 6px;
-            background: #ffff00; border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 3px yellow;
-            transition: all 0.2s;
+            position: absolute; width: 6px; height: 6px; background: yellow; 
+            border-radius: 50%; transform: translate(-50%, -50%); transition: all 0.1s;
         }
         .radar-dot.target { 
-            background: #ff0000; width: 10px; height: 10px; z-index: 10; 
+            background: #ff3333; width: 10px; height: 10px; z-index: 10; 
             border: 2px solid white; box-shadow: 0 0 8px red;
-            animation: pulse 1s infinite;
         }
-        @keyframes pulse { 0% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.3); } 100% { transform: translate(-50%, -50%) scale(1); } }
 
-        /* --- MENU LATERAL --- */
+        /* --- HUD --- */
+        #nav-card {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 85%; max-width: 350px; background: rgba(20, 20, 20, 0.95); 
+            padding: 20px; border-radius: 20px; border: 1px solid #444;
+            text-align: center; color: white; z-index: 9995; display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .btn-stop {
+            background: #e74c3c; border: none; color: white; padding: 12px 30px; 
+            border-radius: 30px; margin-top: 15px; font-weight: bold; font-size: 14px;
+            box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+        }
+
+        /* --- MENU LISTA --- */
         #menu-btn {
-            position: fixed; top: 15px; left: 15px; z-index: 9995;
-            background: white; border: none; border-radius: 12px;
-            width: 45px; height: 45px; font-size: 24px; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: none;
-            transition: transform 0.1s;
+            position: fixed; top: 10px; left: 10px; z-index: 9995;
+            background: white; border: none; padding: 12px; border-radius: 10px; 
+            font-size: 20px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
-        #menu-btn:active { transform: scale(0.95); }
-
         #sidebar {
-            position: fixed; top: 0; left: -100%; width: 85%; max-width: 320px; height: 100%;
-            background: rgba(255, 255, 255, 0.95); z-index: 9996;
-            transition: left 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-            display: flex; flex-direction: column;
-            box-shadow: 5px 0 25px rgba(0,0,0,0.3);
+            position: fixed; top: 0; left: -100%; width: 85%; height: 100%;
+            background: #f5f6fa; z-index: 9996; transition: 0.3s cubic-bezier(0.4,0,0.2,1); 
+            padding: 0; box-sizing: border-box; overflow-y: auto;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.2);
         }
         #sidebar.open { left: 0; }
         
-        .sidebar-header { 
-            padding: 20px; background: #1e272e; color: white; 
+        .sidebar-header {
+            padding: 20px; background: white; border-bottom: 1px solid #ddd;
             display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky; top: 0;
         }
-        .sidebar-header h3 { margin: 0; font-size: 18px; font-weight: 500; }
-        
-        #tree-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
-        .list-item { 
-            padding: 18px 20px; border-bottom: 1px solid #eee; cursor: pointer; 
-            display: flex; justify-content: space-between; align-items: center;
-            transition: background 0.2s;
+        .tree-item {
+            padding: 20px; border-bottom: 1px solid #e1e1e1; cursor: pointer; background: white;
         }
-        .list-item:active { background: #f1f2f6; }
-        .list-item strong { color: #2f3542; font-size: 16px; }
-        .list-item span { color: #747d8c; font-size: 13px; background: #dfe4ea; padding: 4px 8px; border-radius: 10px; }
-        .list-item.selected { background: #eccc6855; border-left: 6px solid #ffa502; }
-
-        /* --- HUD INFERIOR --- */
-        #nav-card {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(30, 39, 46, 0.95); color: white; 
-            padding: 15px 25px; border-radius: 20px; 
-            z-index: 9995; text-align: center;
-            display: none; width: 80%; max-width: 300px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border: 1px solid #57606f;
-            backdrop-filter: blur(10px);
-        }
-        .target-title { color: #ffa502; font-size: 18px; font-weight: bold; margin-bottom: 5px; display: block; }
-        .target-dist { font-size: 32px; font-weight: 800; font-family: sans-serif; display: block; line-height: 1; margin-bottom: 5px; }
-        .target-hint { color: #a4b0be; font-size: 12px; display: block; margin-bottom: 10px; }
-        .btn-stop { 
-            background: #ff4757; border: none; color: white; 
-            padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: bold;
-            cursor: pointer; width: 100%;
-        }
-
-        /* --- SETAS DE BORDA (INDICADOR FORA DE TELA) --- */
-        .edge-arrow {
-            position: fixed; width: 40px; height: 40px; 
-            background: red; z-index: 9990; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            color: white; font-weight: bold; font-size: 20px;
-            box-shadow: 0 0 10px red; display: none;
-        }
+        .tree-item:active { background: #f0f0f0; }
+        .tree-item b { display: block; font-size: 16px; color: #2c3e50; margin-bottom: 4px; }
+        .tree-item span { font-size: 13px; color: #7f8c8d; background: #ecf0f1; padding: 4px 8px; border-radius: 12px;}
 
         /* --- START SCREEN --- */
         #start-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10000; background: #1e272e;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a;
+            z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        .panel { background: white; padding: 30px; border-radius: 20px; text-align: center; width: 85%; max-width: 320px; }
-        .btn-primary { 
-            background: #2ed573; color: white; border: none; 
-            padding: 15px; border-radius: 12px; width: 100%; 
-            margin-top: 15px; font-size: 16px; font-weight: bold; 
-            box-shadow: 0 4px 0 #26af61; cursor: pointer;
-        }
-        .btn-primary:active { transform: translateY(4px); box-shadow: none; }
+        .panel { background: white; padding: 30px; border-radius: 15px; width: 80%; max-width: 400px; text-align: center; }
         .hidden { display: none !important; }
 
+        /* Setas de Borda */
+        .edge-arrow {
+            position: fixed; width: 50px; height: 50px; 
+            background: rgba(255, 0, 0, 0.9); border: 3px solid white;
+            color: white; border-radius: 50%; display: none; 
+            justify-content: center; align-items: center;
+            font-weight: 900; font-size: 24px; z-index: 9990;
+            box-shadow: 0 0 15px rgba(255,0,0,0.5);
+        }
     </style>
 </head>
 <body>
 
+    <div id="console-log">Aguardando GPS...</div>
+
     <!-- Radar -->
-    <div id="radar-container">
-        <div id="radar-center"></div>
-    </div>
+    <div id="radar-container"><div id="radar-center"></div></div>
 
     <!-- Menu -->
     <button id="menu-btn" onclick="toggleSidebar()">☰</button>
     <div id="sidebar">
         <div class="sidebar-header">
-            <h3>📍 Pontos Mapeados</h3>
-            <button onclick="toggleSidebar()" style="background:none;border:none;color:white;font-size:24px;">&times;</button>
+            <h3 style="margin:0;">📍 Locais</h3>
+            <button onclick="toggleSidebar()" style="border:none; background:none; font-size:24px;">&times;</button>
         </div>
-        <ul id="tree-list">
-            <li style="padding:30px; text-align:center; color:#999;">
-                Nenhum arquivo carregado.<br>Use o botão de carregar.
-            </li>
-        </ul>
+        <ul id="tree-list" style="list-style: none; padding: 0; margin: 0;"></ul>
     </div>
 
-    <!-- HUD de Navegação -->
+    <!-- HUD Navegação -->
     <div id="nav-card">
-        <span class="target-title" id="hud-name">Destino</span>
-        <span class="target-dist" id="hud-dist">0m</span>
-        <span class="target-hint">Siga as bolinhas amarelas</span>
-        <button class="btn-stop" onclick="stopNavigation()">PARAR NAVEGAÇÃO</button>
+        <h2 id="hud-name" style="margin:0; color:#f1c40f; font-size: 20px;">Destino</h2>
+        <div id="hud-dist" style="font-size: 42px; font-weight:800; margin: 10px 0;">0m</div>
+        <div style="font-size: 13px; color: #bbb;">Siga a direção ou a seta vermelha.</div>
+        <button class="btn-stop" onclick="stopNav()">PARAR NAVEGAÇÃO</button>
     </div>
 
-    <!-- Setas de Indicação -->
-    <div id="arrow-left" class="edge-arrow" style="top:50%; left:10px; transform:translateY(-50%);">←</div>
-    <div id="arrow-right" class="edge-arrow" style="top:50%; right:10px; transform:translateY(-50%);">→</div>
-
-    <div id="console-log">Aguardando GPS...</div>
+    <!-- Setas Direcionais -->
+    <div id="arrow-left" class="edge-arrow" style="left: 15px; top: 50%; transform: translateY(-50%);">←</div>
+    <div id="arrow-right" class="edge-arrow" style="right: 15px; top: 50%; transform: translateY(-50%);">→</div>
 
     <!-- Tela Inicial -->
     <div id="start-screen">
-        <div class="panel" id="panel-perm">
-            <h2 style="margin-top:0; color:#2f3542;">🌳 AR Pro Viewer</h2>
-            <p style="color:#747d8c; line-height:1.5;">Precisamos ativar o GPS de alta precisão e a Câmera para encontrar as árvores.</p>
-            <button class="btn-primary" onclick="initApp()">INICIAR SISTEMA</button>
+        <div class="panel" id="p1">
+            <h2 style="color:#2c3e50">AR Pro Final</h2>
+            <p style="color:#7f8c8d">Localizador com Altitude Automática.</p>
+            <button onclick="startApp()" style="padding:15px; background:#27ae60; color:white; border:none; border-radius:8px; width:100%; font-size:16px; font-weight:bold; cursor:pointer; margin-top:10px;">INICIAR SISTEMA</button>
         </div>
-        
-        <div class="panel hidden" id="panel-file">
-            <h3 style="margin-top:0; color:#2f3542;">Carregar Mapa</h3>
-            <p style="color:#747d8c; font-size:14px;">Selecione seu arquivo .KMZ ou .KML</p>
-            <button class="btn-primary" onclick="document.getElementById('fileInput').click()">📂 ABRIR ARQUIVO</button>
+        <div class="panel hidden" id="p2">
+            <h3>Carregar Mapa</h3>
+            <button onclick="document.getElementById('fileInput').click()" style="padding:12px; background:#3498db; color:white; border:none; border-radius:5px; width:100%; font-weight:bold; margin-bottom:15px;">📂 ABRIR ARQUIVO (.KMZ)</button>
             <input type="file" id="fileInput" accept=".kmz,.kml" style="display:none">
             
-            <div style="margin-top:20px; border-top:1px solid #eee; padding-top:15px;">
-                <button style="background:none; border:1px solid #ccc; padding:8px 15px; border-radius:20px; color:#666; font-size:12px;" onclick="addTestTree()">
-                    + Criar Árvore Teste (Aqui)
-                </button>
+            <div style="border-top:1px solid #eee; margin-top:15px; padding-top:15px;">
+                <button onclick="addTestObject()" style="background:none; border:1px solid #bdc3c7; color:#7f8c8d; padding:8px 15px; border-radius:20px; font-size:12px;">+ Criar Ponto de Teste</button>
             </div>
         </div>
     </div>
 
-    <!-- CENA A-FRAME -->
+    <!-- Cena 3D -->
     <div id="scene-wrapper"></div>
 
     <script>
-        const log = (msg) => document.getElementById('console-log').innerText = msg;
+        const log = msg => document.getElementById('console-log').innerText = msg;
         
-        // Estado do App
-        let treeEntities = []; 
-        let currentTargetId = null;
+        let trees = [];
+        let currentTarget = null;
+        // Altura Fixa: 0 coloca no mesmo nível da câmera (nível dos olhos/celular)
+        const FIXED_HEIGHT = 0; 
         let userLat = 0, userLon = 0, userHeading = 0;
-        let trailDots = []; // Array para as bolinhas da trilha
+        let watchId = null;
 
         // 1. Inicialização
-        async function initApp() {
+        async function startApp() {
             try {
-                // Permissão Vídeo
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                stream.getTracks().forEach(t => t.stop());
-                
-                // Permissão Bússola (iOS)
+                // iOS Permission
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     await DeviceOrientationEvent.requestPermission();
                 }
 
-                if(!navigator.geolocation) throw new Error("GPS Bloqueado");
+                // Câmera
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                stream.getTracks().forEach(t => t.stop()); 
 
-                navigator.geolocation.getCurrentPosition(pos => {
-                    injectARScene();
-                    document.getElementById('panel-perm').classList.add('hidden');
-                    document.getElementById('panel-file').classList.remove('hidden');
-                    
-                    // Inicia Listeners
-                    window.addEventListener('deviceorientation', handleOrientation);
-                    setInterval(updateGPSLoop, 1000); // 1s loop
-                    setInterval(updateVisualsLoop, 100); // Fast loop
-                    
-                    log("GPS Conectado. Selecione o arquivo.");
-                }, 
-                err => alert("Erro GPS: " + err.message),
-                { enableHighAccuracy: true }
-                );
+                // GPS Watch
+                if("geolocation" in navigator) {
+                    watchId = navigator.geolocation.watchPosition(pos => {
+                        userLat = pos.coords.latitude;
+                        userLon = pos.coords.longitude;
+                        
+                        // Primeira vez: Injeta Cena
+                        if(document.getElementById('scene-wrapper').innerHTML === "") {
+                            injectScene();
+                            document.getElementById('p1').classList.add('hidden');
+                            document.getElementById('p2').classList.remove('hidden');
+                            startLoops();
+                        }
+                    }, err => {
+                        alert("Erro GPS: " + err.message);
+                    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+                } else {
+                    alert("GPS não suportado.");
+                }
 
-            } catch(e) { alert(e.message); }
+                // Bússola
+                window.addEventListener('deviceorientation', e => {
+                    if(e.webkitCompassHeading) userHeading = e.webkitCompassHeading;
+                    else if(e.alpha) userHeading = 360 - e.alpha;
+                });
+
+            } catch(e) { alert("Erro: " + e.message); }
         }
 
-        function injectARScene() {
-            const wrapper = document.getElementById('scene-wrapper');
-            // Usa maxDistance gigante para garantir que apareça
-            wrapper.innerHTML = `
-                <a-scene embedded vr-mode-ui="enabled: false" arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true; antialias: true;">
+        function injectScene() {
+            document.getElementById('scene-wrapper').innerHTML = `
+                <a-scene embedded vr-mode-ui="enabled: false" 
+                    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;" 
+                    renderer="logarithmicDepthBuffer: true; antialias: true;">
                     
-                    <a-camera id="cam" gps-camera="minDistance: 0; maxDistance: 10000;" rotation-reader></a-camera>
+                    <!-- Câmera GPS -->
+                    <a-camera id="cam" gps-camera="minDistance: 0; maxDistance: 20000;" rotation-reader></a-camera>
                     
-                    <!-- Container Árvores -->
+                    <!-- Container Objetos -->
                     <a-entity id="tree-container"></a-entity>
-                    
-                    <!-- Container Trilha (Bolinhas) -->
-                    <a-entity id="trail-container"></a-entity>
-
                 </a-scene>
             `;
+            log("GPS Ativo. Carregue o arquivo.");
         }
 
-        // 2. Leitura de Arquivo
-        document.getElementById('fileInput').addEventListener('change', async (e) => {
+        function startLoops() {
+            setInterval(updateDistances, 1000); 
+            setInterval(updateVisuals, 100);    
+        }
+
+        // 2. Parse Arquivo
+        document.getElementById('fileInput').addEventListener('change', async e => {
             const file = e.target.files[0];
             if(!file) return;
-            
             try {
-                const zip = new JSZip();
-                const content = await zip.loadAsync(file);
-                const kmlName = Object.keys(content.files).find(n => n.toLowerCase().endsWith('.kml'));
-                const kmlText = await content.files[kmlName].async("string");
-                parseKML(kmlText);
-                
-                // Fecha UI inicial
-                document.getElementById('start-screen').classList.add('hidden');
-                document.getElementById('menu-btn').style.display = 'block';
-                document.getElementById('radar-container').style.display = 'block';
-                toggleSidebar();
-
-            } catch(err) { alert("Erro no arquivo KMZ/KML"); }
+                let kmlText = "";
+                if(file.name.toLowerCase().endsWith('.kmz')) {
+                    const zip = new JSZip();
+                    const content = await zip.loadAsync(file);
+                    const kmlName = Object.keys(content.files).find(n => n.toLowerCase().endsWith('.kml'));
+                    if(kmlName) kmlText = await content.files[kmlName].async("string");
+                } else {
+                    kmlText = await file.text();
+                }
+                if(kmlText) parseKML(kmlText);
+            } catch(err) { alert("Erro arquivo: " + err); }
         });
 
         function parseKML(xml) {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xml, "text/xml");
-            const placemarks = xmlDoc.getElementsByTagName("Placemark");
+            const doc = new DOMParser().parseFromString(xml, "text/xml");
+            trees = [];
             const container = document.getElementById('tree-container');
-            
-            treeEntities = [];
             container.innerHTML = '';
-            
+
             let count = 0;
+            const placemarks = doc.getElementsByTagName("Placemark");
+            
             for(let p of placemarks) {
-                const coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
-                const name = p.getElementsByTagName("name")[0]?.textContent || `Ponto ${count+1}`;
+                let coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
+                let name = p.getElementsByTagName("name")[0]?.textContent || `Ponto ${count + 1}`;
                 
                 if(coords) {
-                    const [lon, lat] = coords.split(',').map(parseFloat);
-                    
-                    // Cria Entidade A-Frame
-                    const el = document.createElement('a-entity');
-                    el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-                    
-                    // Visual: Cone Verde + Texto
-                    // Importante: position y=0 garante que fique no chao relativo
-                    el.innerHTML = `
-                        <a-entity position="0 0 0" scale="5 5 5" class="tree-model">
-                            <a-text value="${name}" align="center" color="#ffeaa7" position="0 4 0" look-at="[gps-camera]" scale="8 8 8" font="roboto"></a-text>
-                            <a-cone color="#00b894" position="0 1.5 0" height="3" radius-bottom="1" opacity="0.9"></a-cone>
-                            <a-cylinder color="#636e72" position="0 0 0" radius="0.3" height="1"></a-cylinder>
-                        </a-entity>
-                    `;
-                    container.appendChild(el);
-
-                    treeEntities.push({
-                        id: count, name: name, lat: lat, lon: lon, el: el, dist: 9999,
-                        radarDot: createRadarDot()
-                    });
-                    count++;
+                    const parts = coords.split(/\s+/)[0].split(',');
+                    const lon = parseFloat(parts[0]);
+                    const lat = parseFloat(parts[1]);
+                    // Ignoramos a altitude do KML e usamos 0 relativo
+                    createTreeEntity(lat, lon, name, count++);
                 }
             }
+            finishLoading();
+        }
+
+        function addTestObject() {
+            const fakeLat = userLat + 0.0001; // ~10m Norte
+            const fakeLon = userLon;
+            const container = document.getElementById('tree-container');
+            if(trees.length === 0) container.innerHTML = '';
+            createTreeEntity(fakeLat, fakeLon, "Teste (Norte)", trees.length);
+            finishLoading();
+            alert("Ponto de teste criado!");
+        }
+
+        function createTreeEntity(lat, lon, name, id) {
+            const container = document.getElementById('tree-container');
+            const el = document.createElement('a-entity');
+            el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+            
+            // ALTURA FIXA (FIXED_HEIGHT = 0)
+            // position="0 0 0" significa "no mesmo lugar do GPS"
+            // O 'y' sendo 0 ou levemente negativo (-1.6) coloca no chão se o celular estiver na altura dos olhos
+            el.innerHTML = `
+                <a-entity position="0 ${FIXED_HEIGHT} 0" class="visual-model">
+                    <a-text value="${name}\n-- m" align="center" color="yellow" 
+                            position="0 5 0" scale="10 10 10" look-at="[gps-camera]"
+                            side="double" font="roboto"></a-text>
+                    
+                    <a-cone color="#2ecc71" position="0 2 0" height="4" radius-bottom="1.5" opacity="0.9"></a-cone>
+                    <a-cylinder color="#7f8c8d" position="0 0 0" height="1" radius="0.4"></a-cylinder>
+                </a-entity>
+            `;
+            
+            container.appendChild(el);
+            
+            // Radar Dot
+            const dot = document.createElement('div');
+            dot.className = 'radar-dot';
+            document.getElementById('radar-container').appendChild(dot);
+
+            trees.push({ id, name, lat, lon, el, dist: 0, radarDot: dot });
+        }
+
+        function finishLoading() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('menu-btn').style.display = 'block';
+            document.getElementById('radar-container').style.display = 'block';
             updateList();
         }
 
-        // 3. Navegação (Target)
-        function selectTarget(id) {
-            // Reseta anterior
-            if(currentTargetId !== null) {
-                const prev = treeEntities.find(t => t.id === currentTargetId);
-                if(prev) {
-                    prev.el.querySelector('a-cone').setAttribute('color', '#00b894'); // Volta pra verde
-                    if(prev.radarDot) prev.radarDot.classList.remove('target');
-                }
-            }
-
-            currentTargetId = id;
-            const tree = treeEntities.find(t => t.id === id);
-            
-            // Visual Destino (Vermelho)
-            tree.el.querySelector('a-cone').setAttribute('color', '#ff4757');
-            if(tree.radarDot) tree.radarDot.classList.add('target');
-            
-            // HUD
-            document.getElementById('nav-card').style.display = 'block';
-            document.getElementById('hud-name').innerText = tree.name;
-            
-            toggleSidebar(); // Fecha menu
-            createTrail(tree); // Cria a linha de bolinhas
-        }
-
-        function stopNavigation() {
-            if(currentTargetId !== null) {
-                const prev = treeEntities.find(t => t.id === currentTargetId);
-                if(prev) {
-                    prev.el.querySelector('a-cone').setAttribute('color', '#00b894');
-                    if(prev.radarDot) prev.radarDot.classList.remove('target');
-                }
-            }
-            currentTargetId = null;
-            document.getElementById('nav-card').style.display = 'none';
-            document.getElementById('arrow-left').style.display = 'none';
-            document.getElementById('arrow-right').style.display = 'none';
-            
-            // Limpa trilha
-            const trailCont = document.getElementById('trail-container');
-            trailCont.innerHTML = '';
-        }
-
-        // 4. Trilha Visual (Bolinhas)
-        function createTrail(targetTree) {
-            const trailCont = document.getElementById('trail-container');
-            trailCont.innerHTML = ''; // Limpa
-            
-            // Criamos 10 bolinhas que vao da origem (0, -1, 0) até o destino
-            // Como não sabemos a posição XYZ exata do destino até o AR.js calcular,
-            // Vamos usar um truque: colocar as bolinhas como filhas do destino e interpolar 'para trás'
-            
-            // Na verdade, o jeito mais estável em AR.js é criar entidades GPS independentes interpoladas
-            // Mas para simplificar, vamos usar o vetor direção relativo visual no updateVisualsLoop
-            
-            // Vamos criar 15 bolinhas amarelas na cena
-            trailDots = [];
-            for(let i=0; i<15; i++) {
-                const dot = document.createElement('a-sphere');
-                dot.setAttribute('radius', '0.3');
-                dot.setAttribute('color', '#ffa502');
-                dot.setAttribute('opacity', '0.8');
-                dot.setAttribute('visible', 'false'); // Escondido até calcular
-                trailCont.appendChild(dot);
-                trailDots.push(dot);
-            }
-        }
-
-        // 5. Loops
-        function updateGPSLoop() {
-            navigator.geolocation.getCurrentPosition(pos => {
-                userLat = pos.coords.latitude;
-                userLon = pos.coords.longitude;
-                
-                treeEntities.forEach(tree => {
-                    tree.dist = haversine(userLat, userLon, tree.lat, tree.lon);
-                    
-                    // Escala baseada na distância para sempre ser visível
-                    // Se longe (>100m), aumenta escala
-                    const scaleFactor = Math.max(5, tree.dist / 10); 
-                    const model = tree.el.querySelector('.tree-model');
-                    if(model) model.setAttribute('scale', `${scaleFactor} ${scaleFactor} ${scaleFactor}`);
-                });
-
-                if(currentTargetId !== null) {
-                    const target = treeEntities.find(t => t.id === currentTargetId);
-                    document.getElementById('hud-dist').innerText = target.dist.toFixed(0) + "m";
-                }
-
-                if(document.getElementById('sidebar').classList.contains('open')) updateList();
-
-            }, null, { enableHighAccuracy: true });
-        }
-
-        function updateVisualsLoop() {
-            // Radar & Edge Arrows
-            const radarRange = 100; // metros no radar
-            
-            treeEntities.forEach(tree => {
-                if(!tree.radarDot) return;
-                
-                // Se for alvo, calcula setas de borda
-                if(tree.id === currentTargetId) {
-                    updateEdgeArrows(tree);
-                    updateTrailPosition(tree); // Atualiza bolinhas
-                }
-
-                // Logica Radar
-                const bearing = getBearing(userLat, userLon, tree.lat, tree.lon);
-                let relAngle = bearing - userHeading;
-                const relRad = (relAngle - 90) * (Math.PI / 180);
-                
-                // Distancia normalizada para o radar
-                let r = (tree.dist / radarRange) * 50; // 50px raio
-                if(r > 50) r = 50; // Clamp na borda
-                
-                const x = 55 + r * Math.cos(relRad);
-                const y = 55 + r * Math.sin(relRad);
-                
-                tree.radarDot.style.left = x + 'px';
-                tree.radarDot.style.top = y + 'px';
-                
-                // Visibilidade no radar
-                if(tree.dist > 300 && tree.id !== currentTargetId) tree.radarDot.style.display = 'none';
-                else tree.radarDot.style.display = 'block';
-            });
-        }
-
-        function updateTrailPosition(targetTree) {
-            // Pega posição do objeto 3D do alvo relativo à camera
-            const object3D = targetTree.el.object3D;
-            const vec = object3D.position; // Vetor (x, y, z)
-            
-            // Desenha as bolinhas interpoladas entre (0,-1,0) e (vec.x, vec.y, vec.z)
-            for(let i=0; i<trailDots.length; i++) {
-                const dot = trailDots[i];
-                const percent = (i+1) / (trailDots.length + 1);
-                
-                // Interpolação Linear
-                const x = vec.x * percent;
-                const z = vec.z * percent;
-                const y = -1; // Mantem no chao (altura fixa da câmera)
-                
-                dot.setAttribute('position', `${x} ${y} ${z}`);
-                dot.setAttribute('visible', 'true');
-            }
-        }
-
-        function updateEdgeArrows(targetTree) {
-            // Calcula se o objeto esta na frente da camera
-            const bearing = getBearing(userLat, userLon, targetTree.lat, targetTree.lon);
-            let diff = (bearing - userHeading + 360) % 360;
-            if(diff > 180) diff -= 360; // Intervalo -180 a 180
-            
-            const leftArrow = document.getElementById('arrow-left');
-            const rightArrow = document.getElementById('arrow-right');
-            
-            // FOV aproximado do celular ~60 graus (+-30)
-            if(diff < -40) {
-                leftArrow.style.display = 'flex';
-                rightArrow.style.display = 'none';
-            } else if (diff > 40) {
-                leftArrow.style.display = 'none';
-                rightArrow.style.display = 'flex';
-            } else {
-                leftArrow.style.display = 'none';
-                rightArrow.style.display = 'none';
-            }
-        }
-
-        // Auxiliares
-        function handleOrientation(e) {
-            if(e.webkitCompassHeading) userHeading = e.webkitCompassHeading;
-            else if(e.alpha) userHeading = e.alpha;
-        }
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-        }
-
-        function createRadarDot() {
-            const d = document.createElement('div');
-            d.className = 'radar-dot';
-            document.getElementById('radar-container').appendChild(d);
-            return d;
-        }
+        // 3. UI e Navegação
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
         function updateList() {
             const list = document.getElementById('tree-list');
             list.innerHTML = '';
-            const sorted = [...treeEntities].sort((a,b) => a.dist - b.dist);
-            
-            sorted.forEach(t => {
+            // Ordena por proximidade
+            trees.sort((a,b) => a.dist - b.dist).forEach(t => {
                 const li = document.createElement('li');
-                li.className = `list-item ${t.id === currentTargetId ? 'selected' : ''}`;
-                li.innerHTML = `
-                    <div>
-                        <strong>${t.name}</strong><br>
-                        <span style="color:#999; font-size:11px;">${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}</span>
-                    </div>
-                    <span>${t.dist.toFixed(0)}m</span>
-                `;
+                li.className = 'tree-item';
+                li.innerHTML = `<b>${t.name}</b> <span id="list-dist-${t.id}">Calc...</span>`;
                 li.onclick = () => selectTarget(t.id);
                 list.appendChild(li);
             });
         }
 
-        // Math
-        function toRad(d) { return d * Math.PI / 180; }
-        function toDeg(r) { return r * 180 / Math.PI; }
-        function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const dLat = toRad(lat2-lat1);
-            const dLon = toRad(lon2-lon1);
-            const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-        function getBearing(lat1, lon1, lat2, lon2) {
-            const y = Math.sin(toRad(lon2-lon1)) * Math.cos(toRad(lat2));
-            const x = Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) -
-                      Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
-            return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        function selectTarget(id) {
+            if(currentTarget) {
+                currentTarget.el.querySelector('a-cone').setAttribute('color', '#2ecc71');
+                currentTarget.radarDot.classList.remove('target');
+            }
+            currentTarget = trees.find(t => t.id === id);
+            currentTarget.el.querySelector('a-cone').setAttribute('color', '#e74c3c'); // Vermelho
+            currentTarget.radarDot.classList.add('target');
+            
+            document.getElementById('nav-card').style.display = 'block';
+            document.getElementById('hud-name').innerText = currentTarget.name;
+            document.getElementById('sidebar').classList.remove('open');
         }
 
-        function addTestTree() {
-            // Adiciona a 5m ao Norte
-            const fake = {
-                id: 999, name: "Teste Visual", lat: userLat + 0.00005, lon: userLon, 
-                el: document.createElement('a-entity'), dist: 0, radarDot: createRadarDot()
-            };
-            fake.el.setAttribute('gps-entity-place', `latitude: ${fake.lat}; longitude: ${fake.lon};`);
-            fake.el.innerHTML = `
-                <a-entity position="0 0 0" scale="5 5 5" class="tree-model">
-                    <a-text value="Teste" align="center" color="red" position="0 2 0" look-at="[gps-camera]"></a-text>
-                    <a-box color="red" position="0 0 0"></a-box>
-                </a-entity>
-            `;
-            document.getElementById('tree-container').appendChild(fake);
-            treeEntities.push(fake);
-            alert("Ponto de teste criado na sua frente!");
-            selectTarget(999);
+        function stopNav() {
+            if(currentTarget) {
+                currentTarget.el.querySelector('a-cone').setAttribute('color', '#2ecc71');
+                currentTarget.radarDot.classList.remove('target');
+            }
+            currentTarget = null;
+            document.getElementById('nav-card').style.display = 'none';
+            document.getElementById('arrow-left').style.display = 'none';
+            document.getElementById('arrow-right').style.display = 'none';
+        }
+
+        // 4. Matemática e Loops
+        function updateDistances() {
+            if(!userLat || !userLon) return;
+            trees.forEach(t => {
+                t.dist = haversine(userLat, userLon, t.lat, t.lon);
+                
+                // Texto 3D
+                const textEl = t.el.querySelector('a-text');
+                if(textEl) textEl.setAttribute('value', `${t.name}\n${t.dist.toFixed(0)}m`);
+
+                // Texto Lista
+                const listSpan = document.getElementById(`list-dist-${t.id}`);
+                if(listSpan) listSpan.innerText = t.dist.toFixed(0) + "m";
+
+                // Escala e Visibilidade
+                const model = t.el.querySelector('.visual-model');
+                if(model) {
+                    // Lógica de escala para não ficar minúsculo longe
+                    let scale = Math.max(3, t.dist / 10);
+                    model.setAttribute('scale', `${scale} ${scale} ${scale}`);
+                }
+                t.el.setAttribute('visible', t.dist < 10000);
+            });
+
+            if(currentTarget) document.getElementById('hud-dist').innerText = currentTarget.dist.toFixed(0) + "m";
+        }
+
+        function updateVisuals() {
+            if(!userLat || !userLon) return;
+            
+            const arrL = document.getElementById('arrow-left');
+            const arrR = document.getElementById('arrow-right');
+            arrL.style.display = 'none';
+            arrR.style.display = 'none';
+
+            trees.forEach(t => {
+                if(!t.radarDot) return;
+                
+                // Radar
+                const bearing = computeBearing(userLat, userLon, t.lat, t.lon);
+                let relAngle = bearing - userHeading;
+                // Normaliza -180 a 180
+                while(relAngle < -180) relAngle += 360;
+                while(relAngle > 180) relAngle -= 360;
+
+                // Raio fixo para direção clara (40%)
+                const r = 40; 
+                const rad = relAngle * (Math.PI / 180);
+                const x = 50 + (r * Math.sin(rad)); 
+                const y = 50 - (r * Math.cos(rad)); // -cos pq topo é 0
+
+                t.radarDot.style.left = x + '%';
+                t.radarDot.style.top = y + '%';
+                t.radarDot.style.display = (t === currentTarget || t.dist < 200) ? 'block' : 'none';
+
+                // Setas (Só alvo)
+                if(currentTarget && t.id === currentTarget.id) {
+                    if(relAngle > 35) arrR.style.display = 'flex';
+                    else if(relAngle < -35) arrL.style.display = 'flex';
+                }
+            });
+        }
+
+        // Helpers Matemáticos
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371000; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function computeBearing(startLat, startLng, destLat, destLng) {
+            const y = Math.sin(destLng*Math.PI/180 - startLng*Math.PI/180) * Math.cos(destLat*Math.PI/180);
+            const x = Math.cos(startLat*Math.PI/180)*Math.sin(destLat*Math.PI/180) - Math.sin(startLat*Math.PI/180)*Math.cos(destLat*Math.PI/180)*Math.cos(destLng*Math.PI/180 - startLng*Math.PI/180);
+            return (Math.atan2(y, x)*180/Math.PI + 360) % 360;
         }
     </script>
 </body>
