@@ -3,106 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Pro - Ajuste de Altura</title>
+    <title>AR Rápido - Campo</title>
 
-    <!-- A-Frame e AR.js -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    <!-- Look-at removido para evitar bugs de rotação, usando geometria fixa -->
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background: #000; }
 
-        /* --- CONTROLES DE ALTURA (O SEGREDO PARA VER O OBJETO) --- */
-        #height-controls {
-            position: fixed; right: 10px; top: 50%; transform: translateY(-50%);
-            display: none; flex-direction: column; gap: 15px; z-index: 9999;
-        }
-        .h-btn {
-            width: 60px; height: 60px; border-radius: 50%; border: 3px solid white;
-            background: rgba(0, 0, 0, 0.7); color: white; font-size: 30px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
-        .h-label {
-            color: yellow; font-size: 12px; text-align: center; 
-            text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.5); padding: 2px; border-radius: 4px;
-        }
-
-        /* --- SETA 2D --- */
-        #guide-container {
+        /* --- SETA DE DIREÇÃO (Que você gostou) --- */
+        #guide-ui {
             position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
-            z-index: 9000; display: none; text-align: center; pointer-events: none;
+            text-align: center; z-index: 9000; pointer-events: none; display: none;
         }
-        #guide-icon { font-size: 80px; color: gold; text-shadow: 0 2px 10px black; transition: 0.1s; }
-        #guide-text { color: white; font-weight: bold; font-size: 18px; text-shadow: 0 2px 5px black; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 10px;}
+        #arrow-icon {
+            font-size: 80px; color: gold; text-shadow: 0 0 10px #000; display: block;
+        }
+        #guide-text {
+            background: rgba(0,0,0,0.6); color: white; padding: 5px 10px; 
+            border-radius: 8px; font-weight: bold; margin-top: 5px;
+        }
 
-        /* --- HUD --- */
+        /* --- HUD INFERIOR --- */
         #hud {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 400px; background: rgba(20, 20, 20, 0.95); 
-            padding: 15px; border-radius: 20px; border: 2px solid #f1c40f;
-            text-align: center; color: white; z-index: 9995; display: none;
+            width: 90%; max-width: 400px; background: rgba(0,0,0,0.8); 
+            padding: 15px; border-radius: 15px; text-align: center; color: white; 
+            z-index: 9995; display: none; border: 2px solid gold;
         }
-        #hud-dist { font-size: 40px; font-weight: 900; margin: 5px 0; color: #fff; }
+        .dist-text { font-size: 45px; font-weight: 900; margin: 0; }
+        .btn-stop {
+            background: red; color: white; padding: 10px 30px; border: none; 
+            border-radius: 50px; font-weight: bold; margin-top: 10px; cursor: pointer;
+        }
 
-        /* --- MENU E TELA INICIAL --- */
-        #menu-btn { position: fixed; top: 15px; left: 15px; z-index: 9995; padding: 10px; background: white; border: none; border-radius: 5px; font-weight: bold; display: none; }
-        #list-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; background: #eee; z-index: 9998; transition: 0.3s; overflow-y: auto; }
+        /* --- LISTA --- */
+        #menu-btn { position: fixed; top: 15px; left: 15px; z-index: 9995; padding: 10px; background: white; border:none; border-radius:5px; display:none; font-weight:bold; }
+        #list-panel { position: fixed; top: 0; left: -100%; width: 100%; height: 100%; background: #f0f0f0; z-index: 9998; transition: 0.3s; overflow-y: auto; }
         #list-panel.open { left: 0; }
-        .list-item { padding: 20px; border-bottom: 1px solid #ccc; background: white; font-size: 16px; }
-        
-        #start { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #222; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .panel { background: white; padding: 30px; border-radius: 10px; width: 80%; text-align: center; }
-        .hidden { display: none !important; }
+        .item { padding: 20px; background: white; border-bottom: 1px solid #ccc; font-size: 16px; }
+
+        /* --- INÍCIO --- */
+        #start { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .card { background: white; padding: 20px; border-radius: 10px; width: 80%; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- SETA 2D -->
-    <div id="guide-container">
-        <div id="guide-icon">⬆</div>
+    <!-- UI VISUAL -->
+    <div id="guide-ui">
+        <div id="arrow-icon">⬆</div>
         <div id="guide-text">EM FRENTE</div>
     </div>
 
-    <!-- CONTROLES DE ALTURA -->
-    <div id="height-controls">
-        <div class="h-label">AJUSTAR<br>ALTURA</div>
-        <button class="h-btn" onclick="changeHeight(2)">⬆</button>
-        <div class="h-label" id="height-val">0m</div>
-        <button class="h-btn" onclick="changeHeight(-2)">⬇</button>
-    </div>
-
-    <!-- HUD -->
     <div id="hud">
-        <h3 id="hud-name" style="margin:0; color: yellow;">Destino</h3>
-        <div id="hud-dist">0m</div>
-        <div style="font-size:11px; color:#ccc">Use os botões laterais se não ver o objeto</div>
-        <button onclick="stopNav()" style="margin-top:10px; padding:10px 30px; background:red; color:white; border:none; border-radius:20px; font-weight:bold;">PARAR</button>
+        <h3 id="target-name" style="margin:0; color:yellow">Nome</h3>
+        <div class="dist-text" id="dist-val">0m</div>
+        <button class="btn-stop" onclick="stopNav()">PARAR</button>
     </div>
 
-    <!-- MENU -->
     <button id="menu-btn" onclick="toggleList()">📂 LISTA</button>
     <div id="list-panel">
-        <div style="padding:20px; background:white; display:flex; justify-content:space-between;">
-            <h2>Destinos</h2> <button onclick="toggleList()">X</button>
+        <div style="padding:15px; background:#ddd; display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0">Pontos</h2> <button onclick="toggleList()" style="padding:5px 10px">X</button>
         </div>
-        <div id="list-items"></div>
+        <div id="list-content"></div>
     </div>
 
-    <!-- TELA INICIAL -->
     <div id="start">
-        <div class="panel" id="p1">
-            <h2>AR Pro + Altura</h2>
-            <p>Use o Ajuste Manual para encontrar objetos enterrados ou voando.</p>
+        <div class="card" id="p1">
+            <h2>Localizador Rápido</h2>
+            <p>Visualização "Pilar de Luz" (Ignora Altitude)</p>
             <button onclick="init()" style="padding:15px; width:100%; background:green; color:white; border:none; font-weight:bold; border-radius:5px;">INICIAR</button>
         </div>
-        <div class="panel hidden" id="p2">
-            <button onclick="document.getElementById('fileInput').click()" style="padding:15px; width:100%; background:blue; color:white; border:none; border-radius:5px;">📂 CARREGAR KMZ</button>
+        <div class="card" id="p2" style="display:none">
+            <button onclick="document.getElementById('fileInput').click()" style="padding:15px; width:100%; background:blue; color:white; border:none; font-weight:bold; border-radius:5px;">📂 CARREGAR KMZ</button>
             <input type="file" id="fileInput" accept=".kmz,.kml" style="display:none">
             <br><br>
-            <button onclick="addTest()" style="padding:10px; width:100%; background:#ccc; border:none; border-radius:5px;">+ Teste (20m Norte)</button>
+            <button onclick="addTest()" style="padding:10px; width:100%;">+ Teste (20m Norte)</button>
         </div>
     </div>
 
@@ -111,11 +91,10 @@
 
     <script>
         let targets = [];
-        let currentTarget = null;
-        let heightOffset = 0; // Ajuste manual de altura
-        let userHeading = 0;
-        let userLat = 0, userLon = 0;
+        let activeTarget = null;
+        let userLat=0, userLon=0, userHeading=0;
 
+        // INICIALIZAÇÃO
         async function init() {
             try {
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -127,33 +106,35 @@
                 navigator.geolocation.watchPosition(pos => {
                     userLat = pos.coords.latitude;
                     userLon = pos.coords.longitude;
+
                     if(!document.getElementById('scene-wrapper').innerHTML) {
                         injectScene();
-                        document.getElementById('p1').classList.add('hidden');
-                        document.getElementById('p2').classList.remove('hidden');
-                        startLoops();
+                        document.getElementById('p1').style.display = 'none';
+                        document.getElementById('p2').style.display = 'block';
+                        startLoop();
                     }
                 }, err => alert("Erro GPS: " + err.message), { enableHighAccuracy: true });
 
                 window.addEventListener('deviceorientation', e => {
                     userHeading = e.webkitCompassHeading || (360 - e.alpha) || 0;
                 });
-
             } catch(e) { alert(e); }
         }
 
         function injectScene() {
+            // minDistance 0 e maxDistance 0 desativa o corte automático do AR.js
             document.getElementById('scene-wrapper').innerHTML = `
                 <a-scene embedded vr-mode-ui="enabled: false" 
                     arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
                     renderer="logarithmicDepthBuffer: true; antialias: true;">
-                    <a-camera id="cam" gps-camera="minDistance: 0; maxDistance: 50000;" rotation-reader></a-camera>
+                    
+                    <a-camera id="cam" gps-camera="minDistance: 0; maxDistance: 0;" rotation-reader></a-camera>
                     <a-entity id="world"></a-entity>
                 </a-scene>
             `;
         }
 
-        // CARREGAR DADOS
+        // ARQUIVOS
         document.getElementById('fileInput').addEventListener('change', async e => {
             const file = e.target.files[0];
             if(!file) return;
@@ -172,155 +153,141 @@
             const world = document.getElementById('world');
             world.innerHTML = '';
             targets = [];
-            let c = 0;
+            let c=0;
             for(let p of doc.getElementsByTagName("Placemark")) {
                 let coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
                 let name = p.getElementsByTagName("name")[0]?.textContent || `Ponto ${c}`;
                 if(coords) {
                     const [lon, lat] = coords.split(',').map(parseFloat);
-                    createObj(lat, lon, name, c++);
+                    createColumn(lat, lon, name, c++);
                 }
             }
             finishLoad();
         }
 
         function addTest() {
-            createObj(userLat + 0.0002, userLon, "TESTE NORTE", 999);
+            createColumn(userLat + 0.0002, userLon, "TESTE NORTE", 999);
             finishLoad();
         }
 
-        function createObj(lat, lon, name, id) {
+        // --- A MÁGICA ACONTECE AQUI ---
+        function createColumn(lat, lon, name, id) {
             const el = document.createElement('a-entity');
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
             
-            // MODELO: ANÉIS GIGANTES VERMELHOS
-            // depthTest: false -> Vê através das paredes
+            // ESTRATÉGIA: COLUNA INFINITA
+            // cylinder height="1000" -> Cria um poste de 1km de altura
+            // position="0 0 0" -> Centralizado na coordenada GPS
+            // material shader: flat -> Cor sólida, sem sombra, brilha no sol
+            // depthTest: false -> Aparece "na frente" de paredes e prédios (Raio-X)
+            
             el.innerHTML = `
-                <a-entity class="visual-container" position="0 0 0">
-                    <a-text value="${name}" align="center" color="yellow" position="0 5 0" scale="15 15 15" look-at="#cam" side="double"></a-text>
+                <a-entity class="marker-vis" visible="false">
+                    <!-- PILAR VERMELHO GIGANTE (Visível de qualquer altura) -->
+                    <a-cylinder color="red" height="1000" radius="2" material="opacity: 0.5; shader: flat; depthTest: false;"></a-cylinder>
                     
-                    <!-- Anéis Concêntricos (Alvo) -->
-                    <a-torus color="red" radius="3" radius-tubular="0.2" rotation="0 0 0" material="opacity: 0.8; depthTest: false;"></a-torus>
-                    <a-torus color="white" radius="2" radius-tubular="0.2" rotation="0 0 0" material="opacity: 0.8; depthTest: false;"></a-torus>
-                    <a-sphere color="red" radius="1" material="opacity: 0.8; depthTest: false;"></a-sphere>
-
-                    <!-- Linha Vertical Infinita -->
-                    <a-cylinder color="red" height="200" radius="0.1" position="0 0 0" material="opacity: 0.5; depthTest: false;"></a-cylinder>
+                    <!-- NÚCLEO AMARELO (Para destacar o centro) -->
+                    <a-cylinder color="yellow" height="1000" radius="0.2" material="shader: flat; depthTest: false;"></a-cylinder>
+                    
+                    <!-- TEXTO NO NÍVEL DOS OLHOS (Aprox) -->
+                    <!-- Repetimos o texto em várias alturas para garantir visibilidade -->
+                    <a-text value="${name}" color="white" align="center" scale="30 30 30" position="0 5 0"  side="double" shader="msdf" font="roboto"></a-text>
+                    <a-text value="${name}" color="white" align="center" scale="30 30 30" position="0 20 0" side="double" shader="msdf" font="roboto"></a-text>
+                    <a-text value="${name}" color="white" align="center" scale="30 30 30" position="0 -10 0" side="double" shader="msdf" font="roboto"></a-text>
                 </a-entity>
             `;
+            
             document.getElementById('world').appendChild(el);
             targets.push({ id, name, lat, lon, el, dist: 0 });
         }
 
         function finishLoad() {
-            document.getElementById('start').classList.add('hidden');
+            document.getElementById('start').style.display = 'none';
             document.getElementById('menu-btn').style.display = 'block';
             updateList();
         }
 
-        // FUNÇÕES DE CONTROLE
+        // UI
         function toggleList() { document.getElementById('list-panel').classList.toggle('open'); }
 
         function updateList() {
-            const div = document.getElementById('list-items');
+            const div = document.getElementById('list-content');
             div.innerHTML = '';
             targets.sort((a,b) => a.dist - b.dist).forEach(t => {
-                const item = document.createElement('div');
-                item.className = 'list-item';
-                item.innerHTML = `<b>${t.name}</b> (${t.dist.toFixed(0)}m)`;
-                item.onclick = () => selectTarget(t.id);
-                div.appendChild(item);
+                const d = document.createElement('div');
+                d.className = 'item';
+                d.innerHTML = `<b>${t.name}</b> (${t.dist.toFixed(0)}m)`;
+                d.onclick = () => selectTarget(t.id);
+                div.appendChild(d);
             });
         }
 
         function selectTarget(id) {
-            currentTarget = targets.find(t => t.id === id);
+            activeTarget = targets.find(t => t.id === id);
             
-            // Reset Altura
-            heightOffset = 0; 
-            document.getElementById('height-val').innerText = "0m";
-            updateHeights();
-
-            // UI
-            document.getElementById('hud').style.display = 'block';
-            document.getElementById('height-controls').style.display = 'flex';
-            document.getElementById('guide-container').style.display = 'block';
-            document.getElementById('hud-name').innerText = currentTarget.name;
-            
-            // Destacar visualmente (Fica maior)
+            // Só mostra o objeto selecionado para não poluir
             targets.forEach(t => {
-                const vis = t.el.querySelector('a-torus');
-                if(vis) vis.setAttribute('color', t.id === id ? 'lime' : 'red');
+                const vis = t.el.querySelector('.marker-vis');
+                if(vis) vis.setAttribute('visible', t.id === id);
             });
 
+            document.getElementById('hud').style.display = 'block';
+            document.getElementById('guide-ui').style.display = 'block';
+            document.getElementById('target-name').innerText = activeTarget.name;
             toggleList();
         }
 
         function stopNav() {
-            currentTarget = null;
-            document.getElementById('hud').style.display = 'none';
-            document.getElementById('height-controls').style.display = 'none';
-            document.getElementById('guide-container').style.display = 'none';
-        }
-
-        // NOVIDADE: AJUSTE DE ALTURA
-        function changeHeight(val) {
-            heightOffset += val;
-            document.getElementById('height-val').innerText = heightOffset + "m";
-            updateHeights();
-        }
-
-        function updateHeights() {
-            // Move o container visual dentro da entidade GPS
+            activeTarget = null;
             targets.forEach(t => {
-                const visual = t.el.querySelector('.visual-container');
-                if(visual) visual.setAttribute('position', `0 ${heightOffset} 0`);
+                const vis = t.el.querySelector('.marker-vis');
+                if(vis) vis.setAttribute('visible', false);
             });
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('guide-ui').style.display = 'none';
         }
 
         // LOOPS
-        function startLoops() {
+        function startLoop() {
+            // Loop 1: Distância (1s)
             setInterval(() => {
                 if(!userLat) return;
                 targets.forEach(t => {
                     t.dist = haversine(userLat, userLon, t.lat, t.lon);
-                    
-                    // Escala para não sumir
-                    const scale = Math.max(1, t.dist / 10);
-                    const vis = t.el.querySelector('.visual-container');
-                    if(vis) vis.setAttribute('scale', `${scale} ${scale} ${scale}`);
-
-                    t.el.setAttribute('visible', t.dist < 10000);
                 });
-                if(currentTarget) document.getElementById('hud-dist').innerText = currentTarget.dist.toFixed(0) + "m";
+                if(activeTarget) {
+                    document.getElementById('dist-val').innerText = activeTarget.dist.toFixed(0) + "m";
+                }
+                updateList(); // Atualiza distâncias na lista
             }, 1000);
 
-            // Loop da Seta 2D
+            // Loop 2: Bússola (rápido)
             setInterval(() => {
-                if(!currentTarget || !userLat) return;
+                if(!activeTarget || !userLat) return;
 
-                const bearing = getBearing(userLat, userLon, currentTarget.lat, currentTarget.lon);
+                const bearing = getBearing(userLat, userLon, activeTarget.lat, activeTarget.lon);
                 let angle = bearing - userHeading;
                 while(angle < -180) angle += 360;
                 while(angle > 180) angle -= 360;
 
-                const icon = document.getElementById('guide-icon');
-                const text = document.getElementById('guide-text');
-                
+                const icon = document.getElementById('arrow-icon');
+                const txt = document.getElementById('guide-text');
+
                 icon.style.transform = `rotate(${angle}deg)`;
 
                 if(Math.abs(angle) < 15) {
-                    text.innerText = "EM FRENTE";
-                    text.style.color = "#0f0";
-                    icon.style.color = "#0f0";
+                    icon.style.color = "#00ff00"; // Verde
+                    txt.innerText = "EM FRENTE";
+                    txt.style.color = "#00ff00";
                 } else {
-                    text.innerText = angle > 0 ? "DIREITA" : "ESQUERDA";
-                    text.style.color = "white";
                     icon.style.color = "gold";
+                    txt.innerText = angle > 0 ? "DIREITA" : "ESQUERDA";
+                    txt.style.color = "white";
                 }
             }, 50);
         }
 
+        // MATH
         function haversine(lat1, lon1, lat2, lon2) {
             const R = 6371000;
             const dLat = (lat2-lat1)*Math.PI/180;
