@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Árvores Viewer</title>
+    <title>AR Árvores Viewer 2.0</title>
 
     <!-- A-Frame (Framework 3D) -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
@@ -17,6 +17,7 @@
             margin: 0;
             overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #000;
         }
 
         /* UI de Overlay */
@@ -27,275 +28,267 @@
             width: 100%;
             height: 100%;
             z-index: 9999;
-            pointer-events: none; /* Deixar passar cliques para o cenário 3D quando escondido */
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
+            justify-content: center;
             align-items: center;
+            background: rgba(0,0,0,0.8); /* Fundo escuro inicial */
+            transition: opacity 0.5s;
+        }
+
+        /* Quando a AR começa, o fundo fica transparente e painel vai pra baixo */
+        body.ar-active #ui-layer {
+            background: transparent;
+            justify-content: flex-end;
             padding-bottom: 20px;
+            pointer-events: none;
+        }
+        
+        body.ar-active .panel {
+            pointer-events: auto;
+            margin-bottom: 20px;
         }
 
         /* Painel de Controle */
         .panel {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             text-align: center;
             width: 85%;
             max-width: 400px;
-            pointer-events: auto;
-            margin-bottom: 20px;
-            transition: transform 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
 
-        .hidden {
-            transform: translateY(150%);
-        }
+        .hidden { display: none !important; }
 
-        h1 { margin: 0 0 10px 0; font-size: 18px; color: #2c3e50; }
-        p { margin: 0 0 15px 0; font-size: 14px; color: #666; }
-
-        /* Botão de Upload estilizado */
-        .file-upload {
-            display: inline-block;
-            position: relative;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        
-        .file-upload input[type=file] {
-            position: absolute;
-            top: 0;
-            right: 0;
-            min-width: 100%;
-            min-height: 100%;
-            font-size: 100px;
-            text-align: right;
-            filter: alpha(opacity=0);
-            opacity: 0;
-            outline: none;
-            background: white;
-            cursor: inherit;
-            display: block;
-        }
+        h1 { margin: 0 0 10px 0; font-size: 20px; color: #2c3e50; }
+        p { margin: 0 0 15px 0; font-size: 14px; color: #666; line-height: 1.5; }
 
         .btn {
             background: #27ae60;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 15px 20px;
+            border-radius: 50px;
             font-weight: bold;
             cursor: pointer;
             font-size: 16px;
             width: 100%;
-            box-sizing: border-box;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+        .btn:active { transform: scale(0.98); }
 
-        .btn:disabled {
-            background: #95a5a6;
-        }
+        .btn-blue { background: #2980b9; }
+        .btn-red { background: #c0392b; }
 
-        .btn-secondary {
-            background: #34495e;
-            margin-top: 10px;
-        }
+        /* Input de arquivo escondido */
+        #fileInput { display: none; }
 
-        /* Info de Depuração / Distância */
+        /* Info de Depuração no topo */
         #debug-info {
             position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.6);
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
             color: #0f0;
-            padding: 5px;
+            padding: 8px;
             font-family: monospace;
-            font-size: 12px;
-            border-radius: 5px;
+            font-size: 11px;
             z-index: 9998;
+            text-align: center;
             pointer-events: none;
-            max-width: 90%;
         }
 
-        .loading {
-            display: none;
-            color: #27ae60;
-            font-weight: bold;
-            margin-top: 10px;
-        }
+        .status-error { color: #ff5252 !important; font-weight: bold; }
+        .status-ok { color: #69f0ae !important; }
     </style>
 </head>
 <body>
 
-    <!-- Interface 2D -->
-    <div id="debug-info">Aguardando GPS...</div>
+    <div id="debug-info">Sistema pronto. Aguardando início.</div>
 
     <div id="ui-layer">
-        <div class="panel" id="control-panel">
-            <h1>Visualizador de Árvores AR</h1>
-            <p>Selecione o arquivo .KMZ das árvores para visualizá-las ao seu redor.</p>
+        
+        <!-- Tela 1: Início / Solicitar Permissão -->
+        <div id="start-screen" class="panel">
+            <h1>🌳 Visualizador AR</h1>
+            <p>Para ver as árvores, precisamos acessar sua <b>Câmera</b> e <b>GPS</b>.</p>
+            <p id="https-warning" class="status-error hidden">⚠️ ALERTA: Site não seguro (HTTP). O GPS não funcionará. Use HTTPS ou Localhost.</p>
+            <button class="btn btn-blue" onclick="startApp()">📍 Permitir GPS e Câmera</button>
+        </div>
+
+        <!-- Tela 2: Carregar Arquivo (aparece depois do GPS ok) -->
+        <div id="upload-screen" class="panel hidden">
+            <h1>Carregar Mapa</h1>
+            <p>GPS Ativo! Agora selecione seu arquivo .KMZ</p>
             
-            <div class="file-upload">
-                <button class="btn">📂 Carregar KMZ</button>
-                <input type="file" id="fileInput" accept=".kmz,.kml">
-            </div>
+            <button class="btn" onclick="document.getElementById('fileInput').click()">📂 Selecionar KMZ</button>
+            <input type="file" id="fileInput" accept=".kmz,.kml">
             
-            <div id="loading-msg" class="loading">Processando árvores...</div>
-            
-            <button class="btn btn-secondary" onclick="toggleSimulate()">🌲 Adicionar Árvore Teste (Aqui)</button>
-            <p style="font-size: 11px; margin-top: 10px; color: #999;">*Use em HTTPS. Calibre a bússola (movimento 8).</p>
+            <div id="loading-msg" style="display:none; color:#27ae60; margin-top:10px; font-weight:bold;">Processando...</div>
+        </div>
+
+        <!-- Controles In-Game -->
+        <div id="game-controls" class="panel hidden" style="padding: 15px;">
+            <p style="margin:0; font-size:12px;">Aponte para o horizonte.</p>
+            <button class="btn btn-secondary" style="font-size:12px; padding:8px; margin-top:5px;" onclick="toggleSimulate()">🌲 Criar Árvore Teste (Aqui)</button>
         </div>
     </div>
 
-    <!-- Cena AR (A-Frame) -->
-    <!-- gps-camera: minDistance limita renderização de coisas muito perto. maxDistance limita coisas longe -->
+    <!-- Cena AR -->
     <a-scene
         embedded
         arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;"
         renderer="logarithmicDepthBuffer: true;"
         vr-mode-ui="enabled: false"
     >
-        
-        <!-- Câmera vinculada ao GPS -->
         <a-camera 
-            gps-camera="minDistance: 1; maxDistance: 5000;" 
+            id="camera-rig"
+            gps-camera="minDistance: 0; maxDistance: 5000; simulateLatitude: 0; simulateLongitude: 0;" 
             rotation-reader
         ></a-camera>
 
-        <!-- Os pontos das árvores serão injetados aqui via Javascript -->
         <a-entity id="tree-container"></a-entity>
-
     </a-scene>
 
     <script>
         const debugInfo = document.getElementById('debug-info');
-        const container = document.getElementById('tree-container');
-        const loadingMsg = document.getElementById('loading-msg');
-        const controlPanel = document.getElementById('control-panel');
+        const treeContainer = document.getElementById('tree-container');
+        
+        // Verificar HTTPS ao carregar
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')) {
+            document.getElementById('https-warning').classList.remove('hidden');
+            debugInfo.innerText = "ERRO CRÍTICO: Site não seguro (HTTP).";
+            debugInfo.classList.add('status-error');
+        }
 
-        // Listener para o arquivo
-        document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+        // 1. Função chamada pelo botão inicial
+        function startApp() {
+            debugInfo.innerText = "Solicitando permissão de GPS...";
+            
+            if (!navigator.geolocation) {
+                alert("Seu navegador não suporta Geolocalização.");
+                return;
+            }
 
-        // Atualiza info de GPS na tela
-        window.addEventListener('gps-camera-update-position', e => {
-            debugInfo.innerText = `GPS Ativo:\nLat: ${e.detail.position.latitude.toFixed(5)}\nLon: ${e.detail.position.longitude.toFixed(5)}\nÁrvores carregadas: ${container.children.length}`;
-        });
+            // Força o pedido de permissão explicitamente antes do AR.js tentar
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    // Sucesso!
+                    debugInfo.innerText = `GPS OK! Precisão: ${position.coords.accuracy}m`;
+                    debugInfo.classList.add('status-ok');
+                    
+                    // Troca as telas
+                    document.getElementById('start-screen').classList.add('hidden');
+                    document.getElementById('upload-screen').classList.remove('hidden');
+                    
+                    // Ativa classe no body para ajustar layout
+                    document.body.classList.add('ar-active');
+                },
+                (error) => {
+                    // Erro
+                    let msg = "Erro desconhecido.";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED: msg = "Permissão negada pelo usuário."; break;
+                        case error.POSITION_UNAVAILABLE: msg = "Sinal de GPS indisponível."; break;
+                        case error.TIMEOUT: msg = "Tempo esgotado ao buscar GPS."; break;
+                    }
+                    debugInfo.innerText = "ERRO GPS: " + msg;
+                    debugInfo.classList.add('status-error');
+                    alert("Erro: " + msg + "\nVerifique se a Localização está ativa no Android e se o site tem permissão.");
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
 
-        async function handleFileSelect(evt) {
+        // Listener do Arquivo
+        document.getElementById('fileInput').addEventListener('change', async (evt) => {
             const file = evt.target.files[0];
             if (!file) return;
 
-            loadingMsg.style.display = 'block';
+            document.getElementById('loading-msg').style.display = 'block';
 
             try {
                 let kmlText = "";
-
                 if (file.name.toLowerCase().endsWith('.kmz')) {
                     const zip = new JSZip();
                     const zipContent = await zip.loadAsync(file);
-                    
-                    // Procura o arquivo .kml dentro do zip
-                    const kmlFile = Object.keys(zipContent.files).find(name => name.toLowerCase().endsWith('.kml'));
-                    if (kmlFile) {
-                        kmlText = await zipContent.files[kmlFile].async("string");
-                    } else {
-                        throw new Error("Arquivo doc.kml não encontrado dentro do KMZ.");
-                    }
-                } else if (file.name.toLowerCase().endsWith('.kml')) {
-                    // Se o usuário subir kml direto
+                    const kmlFile = Object.keys(zipContent.files).find(n => n.toLowerCase().endsWith('.kml'));
+                    if (kmlFile) kmlText = await zipContent.files[kmlFile].async("string");
+                } else {
                     const reader = new FileReader();
                     reader.readAsText(file);
-                    await new Promise(resolve => reader.onload = resolve);
+                    await new Promise(r => reader.onload = r);
                     kmlText = reader.result;
                 }
 
                 parseKML(kmlText);
                 
-                loadingMsg.style.display = 'none';
-                // Esconde o painel para ver a câmera, deixa um botão pequeno (opcional, aqui só escondemos)
-                controlPanel.classList.add('hidden');
-                alert("Árvores carregadas! Olhe ao redor. Se estiver longe, nada aparecerá.");
+                // Esconde upload e mostra jogo
+                document.getElementById('upload-screen').classList.add('hidden');
+                document.getElementById('game-controls').classList.remove('hidden');
 
             } catch (err) {
-                console.error(err);
                 alert("Erro ao ler arquivo: " + err.message);
-                loadingMsg.style.display = 'none';
+            } finally {
+                document.getElementById('loading-msg').style.display = 'none';
             }
-        }
+        });
 
-        function parseKML(xmlString) {
+        function parseKML(xml) {
             const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+            const xmlDoc = parser.parseFromString(xml, "text/xml");
             const placemarks = xmlDoc.getElementsByTagName("Placemark");
-            
             let count = 0;
 
-            for (let i = 0; i < placemarks.length; i++) {
-                const placemark = placemarks[i];
-                const name = placemark.getElementsByTagName("name")[0]?.textContent || "Árvore";
-                
-                // Pega coordenadas
-                const point = placemark.getElementsByTagName("Point")[0];
-                if (point) {
-                    const coordsText = point.getElementsByTagName("coordinates")[0]?.textContent.trim();
-                    if (coordsText) {
-                        // KML é Longitude, Latitude, Altitude
-                        const parts = coordsText.split(',');
-                        const lon = parseFloat(parts[0]);
-                        const lat = parseFloat(parts[1]);
-
-                        createTreeEntity(lat, lon, name);
-                        count++;
-                    }
+            for (let p of placemarks) {
+                const coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
+                const name = p.getElementsByTagName("name")[0]?.textContent || "Árvore";
+                if (coords) {
+                    const [lon, lat] = coords.split(',').map(parseFloat);
+                    addTree(lat, lon, name);
+                    count++;
                 }
             }
-            debugInfo.innerText += `\nProcessado: ${count} árvores.`;
+            alert(`${count} árvores carregadas!`);
         }
 
-        function createTreeEntity(lat, lon, name) {
-            // Cria o elemento A-Frame
+        function addTree(lat, lon, name) {
             const el = document.createElement('a-entity');
-            
-            // Atributo crucial: gps-entity-place
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-            
-            // Vamos criar um visual simples: Um cilindro marrom (tronco) e um cone verde (copa)
-            // Usar primitivas é melhor que carregar modelos 3D pesados para muitas árvores
-            
-            const scale = "2 2 2"; // Tamanho da árvore na tela
-
             el.innerHTML = `
-                <a-entity scale="${scale}" position="0 0 0">
-                    <!-- Texto flutuante -->
-                    <a-text value="${name}" align="center" color="yellow" position="0 4 0" scale="2 2 2" look-at="[gps-camera]"></a-text>
-                    
-                    <!-- Copa -->
+                <a-entity scale="2 2 2" position="0 0 0">
+                    <a-text value="${name}" align="center" color="yellow" position="0 4 0" side="double" look-at="[gps-camera]"></a-text>
                     <a-cone color="#2ecc71" position="0 2 0" radius-bottom="1" radius-top="0" height="3"></a-cone>
-                    
-                    <!-- Tronco -->
                     <a-cylinder color="#5d4037" position="0 0.5 0" radius="0.3" height="1"></a-cylinder>
                 </a-entity>
             `;
-
-            container.appendChild(el);
+            treeContainer.appendChild(el);
         }
 
-        // Função para simular uma árvore 5 metros ao norte de onde você está
-        // Útil para testar se o app funciona sem ir até a floresta
         function toggleSimulate() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    const lat = position.coords.latitude + 0.0001; // Um pouco ao norte
-                    const lon = position.coords.longitude;
-                    createTreeEntity(lat, lon, "Árvore Teste");
-                    controlPanel.classList.add('hidden');
-                    alert("Árvore de teste criada a ~10 metros ao norte.");
-                });
-            } else {
-                alert("Geolocalização não disponível.");
-            }
+            navigator.geolocation.getCurrentPosition((pos) => {
+                addTree(pos.coords.latitude + 0.0002, pos.coords.longitude, "Teste Norte");
+                alert("Árvore criada ao Norte.");
+            });
         }
+
+        // Atualizador de Status AR.js
+        window.addEventListener('gps-camera-update-position', e => {
+            const d = Math.round(e.detail.position.latitude * 1000) / 1000;
+            debugInfo.innerText = `GPS Ativo | Lat: ${d}... | Árvores: ${treeContainer.children.length}`;
+            debugInfo.classList.add('status-ok');
+        });
     </script>
 </body>
 </html>
