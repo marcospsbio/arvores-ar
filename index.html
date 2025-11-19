@@ -3,445 +3,424 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Pro Final</title>
+    <title>AR Locator - Campo 500m</title>
 
     <script>
-        // Log simplificado
+        // Log de erros
         window.onerror = function(msg) {
             var logElem = document.getElementById('console-log');
             if (logElem) logElem.innerText = "⚠️ " + msg;
         };
     </script>
 
-    <!-- A-Frame & AR.js -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
-    <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js' crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+    <!-- A-Frame 1.3.0 + AR.js -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #000; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #000; }
         
         #console-log {
             position: fixed; top: 0; left: 0; width: 100%;
-            background: rgba(0,0,0,0.5); color: #0f0; font-size: 11px; 
-            pointer-events: none; z-index: 9999; text-align: center; padding: 4px;
+            background: rgba(0,0,0,0.6); color: #00ff00; font-size: 12px; 
+            pointer-events: none; z-index: 9999; text-align: center; padding: 5px;
         }
 
         /* --- RADAR --- */
         #radar-container {
-            position: fixed; top: 10px; right: 10px; width: 110px; height: 110px;
-            background: rgba(0, 20, 0, 0.7); border: 2px solid #0f0; border-radius: 50%;
+            position: fixed; top: 15px; right: 15px; width: 120px; height: 120px;
+            background: rgba(0, 30, 0, 0.8); border: 2px solid #0f0; border-radius: 50%;
             z-index: 9990; display: none; overflow: hidden;
-            box-shadow: 0 0 10px rgba(0,255,0,0.3);
+            box-shadow: 0 0 15px rgba(0,255,0,0.4);
         }
-        #radar-container::before, #radar-container::after {
-            content: ''; position: absolute; background: rgba(0, 255, 0, 0.2);
-        }
-        #radar-container::before { top: 50%; left: 0; width: 100%; height: 1px; }
-        #radar-container::after { top: 0; left: 50%; width: 1px; height: 100%; }
-        
         #radar-center {
-            position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; 
-            background: #fff; transform: translate(-50%, -50%); border-radius: 50%; 
-            z-index: 2; box-shadow: 0 0 4px white;
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; 
+            background: #fff; transform: translate(-50%, -50%); border-radius: 50%;
         }
         .radar-dot {
-            position: absolute; width: 6px; height: 6px; background: yellow; 
-            border-radius: 50%; transform: translate(-50%, -50%); transition: all 0.1s;
+            position: absolute; width: 8px; height: 8px; background: yellow; 
+            border-radius: 50%; transform: translate(-50%, -50%);
         }
         .radar-dot.target { 
-            background: #ff3333; width: 10px; height: 10px; z-index: 10; 
-            border: 2px solid white; box-shadow: 0 0 8px red;
+            background: #ff0000; width: 12px; height: 12px; z-index: 10; 
+            border: 2px solid #fff; box-shadow: 0 0 10px #ff0000;
         }
 
-        /* --- HUD --- */
-        #nav-card {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 85%; max-width: 350px; background: rgba(20, 20, 20, 0.95); 
-            padding: 20px; border-radius: 20px; border: 1px solid #444;
+        /* --- HUD INFERIOR --- */
+        #nav-panel {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; background: rgba(10, 10, 10, 0.9); 
+            padding: 15px; border-radius: 15px; border: 1px solid #555;
             text-align: center; color: white; z-index: 9995; display: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
+        .big-dist { font-size: 40px; font-weight: 800; color: #fff; margin: 5px 0; }
         .btn-stop {
-            background: #e74c3c; border: none; color: white; padding: 12px 30px; 
-            border-radius: 30px; margin-top: 15px; font-weight: bold; font-size: 14px;
-            box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+            background: #c0392b; color: white; border: none; padding: 10px 30px; 
+            border-radius: 50px; font-weight: bold; font-size: 14px; cursor: pointer;
         }
 
         /* --- MENU LISTA --- */
         #menu-btn {
-            position: fixed; top: 10px; left: 10px; z-index: 9995;
-            background: white; border: none; padding: 12px; border-radius: 10px; 
-            font-size: 20px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            position: fixed; top: 15px; left: 15px; z-index: 9995;
+            background: white; border: none; padding: 10px 15px; border-radius: 8px; 
+            font-size: 24px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         #sidebar {
-            position: fixed; top: 0; left: -100%; width: 85%; height: 100%;
-            background: #f5f6fa; z-index: 9996; transition: 0.3s cubic-bezier(0.4,0,0.2,1); 
-            padding: 0; box-sizing: border-box; overflow-y: auto;
-            box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+            position: fixed; top: 0; left: -100%; width: 80%; height: 100%;
+            background: #f4f4f4; z-index: 9996; transition: 0.3s; padding: 0; 
+            overflow-y: auto; box-shadow: 5px 0 20px rgba(0,0,0,0.5);
         }
         #sidebar.open { left: 0; }
-        
-        .sidebar-header {
-            padding: 20px; background: white; border-bottom: 1px solid #ddd;
+        .list-header {
+            background: #fff; padding: 20px; border-bottom: 1px solid #ddd;
             display: flex; justify-content: space-between; align-items: center;
-            position: sticky; top: 0;
         }
-        .tree-item {
-            padding: 20px; border-bottom: 1px solid #e1e1e1; cursor: pointer; background: white;
+        .list-item {
+            padding: 20px; border-bottom: 1px solid #ddd; background: white; cursor: pointer;
         }
-        .tree-item:active { background: #f0f0f0; }
-        .tree-item b { display: block; font-size: 16px; color: #2c3e50; margin-bottom: 4px; }
-        .tree-item span { font-size: 13px; color: #7f8c8d; background: #ecf0f1; padding: 4px 8px; border-radius: 12px;}
+        .list-item:active { background: #e0e0e0; }
+        .near-badge {
+            background: #27ae60; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;
+        }
+        .far-badge {
+            background: #7f8c8d; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;
+        }
 
-        /* --- START SCREEN --- */
+        /* --- TELA INICIAL --- */
         #start-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #222;
             z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        .panel { background: white; padding: 30px; border-radius: 15px; width: 80%; max-width: 400px; text-align: center; }
+        .card { background: white; padding: 30px; border-radius: 10px; width: 80%; max-width: 350px; text-align: center; }
         .hidden { display: none !important; }
-
-        /* Setas de Borda */
-        .edge-arrow {
-            position: fixed; width: 50px; height: 50px; 
-            background: rgba(255, 0, 0, 0.9); border: 3px solid white;
-            color: white; border-radius: 50%; display: none; 
-            justify-content: center; align-items: center;
-            font-weight: 900; font-size: 24px; z-index: 9990;
-            box-shadow: 0 0 15px rgba(255,0,0,0.5);
-        }
     </style>
 </head>
 <body>
 
-    <div id="console-log">Aguardando GPS...</div>
+    <div id="console-log">Iniciando GPS...</div>
 
     <!-- Radar -->
     <div id="radar-container"><div id="radar-center"></div></div>
 
     <!-- Menu -->
-    <button id="menu-btn" onclick="toggleSidebar()">☰</button>
+    <button id="menu-btn" onclick="toggleSidebar()">📂 LISTA</button>
     <div id="sidebar">
-        <div class="sidebar-header">
-            <h3 style="margin:0;">📍 Locais</h3>
-            <button onclick="toggleSidebar()" style="border:none; background:none; font-size:24px;">&times;</button>
+        <div class="list-header">
+            <h3 style="margin:0">Pontos Próximos</h3>
+            <button onclick="toggleSidebar()" style="font-size:20px; border:none; background:none;">✕</button>
         </div>
-        <ul id="tree-list" style="list-style: none; padding: 0; margin: 0;"></ul>
+        <ul id="tree-list" style="list-style:none; padding:0; margin:0;"></ul>
     </div>
 
-    <!-- HUD Navegação -->
-    <div id="nav-card">
-        <h2 id="hud-name" style="margin:0; color:#f1c40f; font-size: 20px;">Destino</h2>
-        <div id="hud-dist" style="font-size: 42px; font-weight:800; margin: 10px 0;">0m</div>
-        <div style="font-size: 13px; color: #bbb;">Siga a direção ou a seta vermelha.</div>
-        <button class="btn-stop" onclick="stopNav()">PARAR NAVEGAÇÃO</button>
+    <!-- Painel de Navegação -->
+    <div id="nav-panel">
+        <h3 id="hud-target" style="margin:0; color: #f1c40f;">Nome do Ponto</h3>
+        <div id="hud-dist" class="big-dist">0m</div>
+        <div style="color:#ccc; font-size:12px; margin-bottom:10px;">Siga a linha amarela</div>
+        <button class="btn-stop" onclick="stopNav()">PARAR</button>
     </div>
-
-    <!-- Setas Direcionais -->
-    <div id="arrow-left" class="edge-arrow" style="left: 15px; top: 50%; transform: translateY(-50%);">←</div>
-    <div id="arrow-right" class="edge-arrow" style="right: 15px; top: 50%; transform: translateY(-50%);">→</div>
 
     <!-- Tela Inicial -->
     <div id="start-screen">
-        <div class="panel" id="p1">
-            <h2 style="color:#2c3e50">AR Pro Final</h2>
-            <p style="color:#7f8c8d">Localizador com Altitude Automática.</p>
-            <button onclick="startApp()" style="padding:15px; background:#27ae60; color:white; border:none; border-radius:8px; width:100%; font-size:16px; font-weight:bold; cursor:pointer; margin-top:10px;">INICIAR SISTEMA</button>
+        <div class="card" id="p1">
+            <h2>Localizador de Campo</h2>
+            <p>Raio de 500m + Linha Guia</p>
+            <button onclick="initApp()" style="padding:15px; width:100%; background:#27ae60; color:white; border:none; font-size:16px; font-weight:bold; border-radius:5px;">INICIAR</button>
         </div>
-        <div class="panel hidden" id="p2">
-            <h3>Carregar Mapa</h3>
-            <button onclick="document.getElementById('fileInput').click()" style="padding:12px; background:#3498db; color:white; border:none; border-radius:5px; width:100%; font-weight:bold; margin-bottom:15px;">📂 ABRIR ARQUIVO (.KMZ)</button>
-            <input type="file" id="fileInput" accept=".kmz,.kml" style="display:none">
-            
-            <div style="border-top:1px solid #eee; margin-top:15px; padding-top:15px;">
-                <button onclick="addTestObject()" style="background:none; border:1px solid #bdc3c7; color:#7f8c8d; padding:8px 15px; border-radius:20px; font-size:12px;">+ Criar Ponto de Teste</button>
-            </div>
+        <div class="card hidden" id="p2">
+            <h3>Carregar Dados</h3>
+            <input type="file" id="fileInput" accept=".kmz,.kml" style="margin-bottom:15px;">
+            <div style="font-size:12px; color:#666; margin:10px 0;">OU</div>
+            <button onclick="createTestPoint()" style="padding:10px; width:100%; background:#3498db; color:white; border:none; border-radius:5px;">+ Criar Ponto Teste (10m)</button>
         </div>
     </div>
 
-    <!-- Cena 3D -->
+    <!-- CENA AR -->
     <div id="scene-wrapper"></div>
 
     <script>
-        const log = msg => document.getElementById('console-log').innerText = msg;
+        const log = txt => document.getElementById('console-log').innerText = txt;
         
-        let trees = [];
+        let points = [];
         let currentTarget = null;
-        // Altura Fixa: 0 coloca no mesmo nível da câmera (nível dos olhos/celular)
-        const FIXED_HEIGHT = 0; 
-        let userLat = 0, userLon = 0, userHeading = 0;
-        let watchId = null;
+        let userLat=0, userLon=0, userHeading=0;
+        
+        // Configurações
+        const VISIBILITY_RADIUS = 500; // Só mostra o que estiver a 500m ou menos
 
-        // 1. Inicialização
-        async function startApp() {
+        // 1. INICIAR SISTEMA
+        async function initApp() {
             try {
-                // iOS Permission
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     await DeviceOrientationEvent.requestPermission();
                 }
-
-                // Câmera
+                
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                stream.getTracks().forEach(t => t.stop()); 
+                stream.getTracks().forEach(t => t.stop());
 
-                // GPS Watch
-                if("geolocation" in navigator) {
-                    watchId = navigator.geolocation.watchPosition(pos => {
-                        userLat = pos.coords.latitude;
-                        userLon = pos.coords.longitude;
-                        
-                        // Primeira vez: Injeta Cena
-                        if(document.getElementById('scene-wrapper').innerHTML === "") {
-                            injectScene();
-                            document.getElementById('p1').classList.add('hidden');
-                            document.getElementById('p2').classList.remove('hidden');
-                            startLoops();
-                        }
-                    }, err => {
-                        alert("Erro GPS: " + err.message);
-                    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-                } else {
-                    alert("GPS não suportado.");
-                }
+                navigator.geolocation.watchPosition(pos => {
+                    userLat = pos.coords.latitude;
+                    userLon = pos.coords.longitude;
+                    
+                    if(!document.querySelector('a-scene')) {
+                        injectScene();
+                        document.getElementById('p1').classList.add('hidden');
+                        document.getElementById('p2').classList.remove('hidden');
+                        startLoop();
+                    }
+                }, err => alert("Erro GPS: " + err.message), { enableHighAccuracy: true });
 
-                // Bússola
                 window.addEventListener('deviceorientation', e => {
                     if(e.webkitCompassHeading) userHeading = e.webkitCompassHeading;
                     else if(e.alpha) userHeading = 360 - e.alpha;
                 });
 
-            } catch(e) { alert("Erro: " + e.message); }
+            } catch(e) { alert(e); }
         }
 
         function injectScene() {
+            // maxDistance grande (2000) para o GPS detectar, mas nós controlamos a visibilidade visualmente
             document.getElementById('scene-wrapper').innerHTML = `
                 <a-scene embedded vr-mode-ui="enabled: false" 
-                    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;" 
+                    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
                     renderer="logarithmicDepthBuffer: true; antialias: true;">
                     
-                    <!-- Câmera GPS -->
-                    <a-camera id="cam" gps-camera="minDistance: 0; maxDistance: 20000;" rotation-reader></a-camera>
-                    
-                    <!-- Container Objetos -->
-                    <a-entity id="tree-container"></a-entity>
+                    <a-camera id="cam" gps-camera="minDistance: 0; maxDistance: 2000;" rotation-reader>
+                    </a-camera>
+
+                    <!-- Container dos Pontos -->
+                    <a-entity id="points-container"></a-entity>
+
+                    <!-- LINHA GUIA (Corda) -->
+                    <a-entity id="guide-line" visible="false" 
+                        line="start: 0 -1 0; end: 0 -1 -5; color: yellow; opacity: 0.8"></a-entity>
+
                 </a-scene>
             `;
-            log("GPS Ativo. Carregue o arquivo.");
+            log("Sistema pronto. Carregue o KMZ.");
         }
 
-        function startLoops() {
-            setInterval(updateDistances, 1000); 
-            setInterval(updateVisuals, 100);    
-        }
-
-        // 2. Parse Arquivo
+        // 2. CARREGAMENTO
         document.getElementById('fileInput').addEventListener('change', async e => {
             const file = e.target.files[0];
             if(!file) return;
-            try {
-                let kmlText = "";
-                if(file.name.toLowerCase().endsWith('.kmz')) {
-                    const zip = new JSZip();
-                    const content = await zip.loadAsync(file);
-                    const kmlName = Object.keys(content.files).find(n => n.toLowerCase().endsWith('.kml'));
-                    if(kmlName) kmlText = await content.files[kmlName].async("string");
-                } else {
-                    kmlText = await file.text();
-                }
-                if(kmlText) parseKML(kmlText);
-            } catch(err) { alert("Erro arquivo: " + err); }
+            
+            let txt = "";
+            if(file.name.toLowerCase().endsWith('.kmz')) {
+                const zip = new JSZip();
+                const content = await zip.loadAsync(file);
+                const kmlName = Object.keys(content.files).find(n => n.endsWith('.kml'));
+                if(kmlName) txt = await content.files[kmlName].async("string");
+            } else {
+                txt = await file.text();
+            }
+            
+            if(txt) parseKML(txt);
         });
 
         function parseKML(xml) {
             const doc = new DOMParser().parseFromString(xml, "text/xml");
-            trees = [];
-            const container = document.getElementById('tree-container');
+            const container = document.getElementById('points-container');
             container.innerHTML = '';
-
-            let count = 0;
-            const placemarks = doc.getElementsByTagName("Placemark");
+            points = [];
             
-            for(let p of placemarks) {
+            let count = 0;
+            for(let p of doc.getElementsByTagName("Placemark")) {
                 let coords = p.getElementsByTagName("coordinates")[0]?.textContent.trim();
-                let name = p.getElementsByTagName("name")[0]?.textContent || `Ponto ${count + 1}`;
+                let name = p.getElementsByTagName("name")[0]?.textContent || `Ponto ${count}`;
                 
                 if(coords) {
-                    const parts = coords.split(/\s+/)[0].split(',');
-                    const lon = parseFloat(parts[0]);
-                    const lat = parseFloat(parts[1]);
-                    // Ignoramos a altitude do KML e usamos 0 relativo
-                    createTreeEntity(lat, lon, name, count++);
+                    const [lon, lat] = coords.split(',').map(parseFloat);
+                    createPoint(lat, lon, name, count++);
                 }
             }
-            finishLoading();
+            finishSetup();
         }
 
-        function addTestObject() {
-            const fakeLat = userLat + 0.0001; // ~10m Norte
-            const fakeLon = userLon;
-            const container = document.getElementById('tree-container');
-            if(trees.length === 0) container.innerHTML = '';
-            createTreeEntity(fakeLat, fakeLon, "Teste (Norte)", trees.length);
-            finishLoading();
-            alert("Ponto de teste criado!");
+        function createTestPoint() {
+            // Cria ponto 20 metros ao Norte
+            createPoint(userLat + 0.0002, userLon, "TESTE DE CAMPO", 999);
+            finishSetup();
         }
 
-        function createTreeEntity(lat, lon, name, id) {
-            const container = document.getElementById('tree-container');
+        function createPoint(lat, lon, name, id) {
             const el = document.createElement('a-entity');
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
             
-            // ALTURA FIXA (FIXED_HEIGHT = 0)
-            // position="0 0 0" significa "no mesmo lugar do GPS"
-            // O 'y' sendo 0 ou levemente negativo (-1.6) coloca no chão se o celular estiver na altura dos olhos
+            // Modelo Visual: Uma "Placa" alta para ser vista de longe
+            // position y=0 é o nível da câmera. Colocamos texto bem alto.
             el.innerHTML = `
-                <a-entity position="0 ${FIXED_HEIGHT} 0" class="visual-model">
-                    <a-text value="${name}\n-- m" align="center" color="yellow" 
-                            position="0 5 0" scale="10 10 10" look-at="[gps-camera]"
-                            side="double" font="roboto"></a-text>
+                <a-entity class="marker-visual" position="0 0 0">
+                    <!-- Texto Amarelo Brilhante -->
+                    <a-text value="${name}\n---" align="center" color="#f1c40f" 
+                        position="0 4 0" scale="15 15 15" look-at="[gps-camera]" side="double" font="roboto"></a-text>
                     
-                    <a-cone color="#2ecc71" position="0 2 0" height="4" radius-bottom="1.5" opacity="0.9"></a-cone>
-                    <a-cylinder color="#7f8c8d" position="0 0 0" height="1" radius="0.4"></a-cylinder>
+                    <!-- Pino Vermelho -->
+                    <a-cylinder color="red" height="4" radius="0.2" position="0 2 0"></a-cylinder>
+                    <a-sphere color="red" radius="0.8" position="0 4 0"></a-sphere>
+                    
+                    <!-- Base (Alvo) -->
+                    <a-ring color="white" radius-inner="1" radius-outer="1.5" rotation="-90 0 0" position="0 0.1 0"></a-ring>
                 </a-entity>
             `;
             
-            container.appendChild(el);
+            document.getElementById('points-container').appendChild(el);
             
             // Radar Dot
             const dot = document.createElement('div');
             dot.className = 'radar-dot';
             document.getElementById('radar-container').appendChild(dot);
-
-            trees.push({ id, name, lat, lon, el, dist: 0, radarDot: dot });
+            
+            points.push({ id, name, lat, lon, el, dist: 99999, dot });
         }
 
-        function finishLoading() {
+        function finishSetup() {
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('menu-btn').style.display = 'block';
             document.getElementById('radar-container').style.display = 'block';
-            updateList();
+            updateCalculations();
         }
 
-        // 3. UI e Navegação
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+        // 3. LÓGICA PRINCIPAL
+        function startLoop() {
+            setInterval(updateCalculations, 1000); // Distância (1s)
+            setInterval(updateVisuals, 50);       // Radar e Linha (rápido)
+        }
 
-        function updateList() {
+        function updateCalculations() {
+            if(!userLat) return;
+
             const list = document.getElementById('tree-list');
             list.innerHTML = '';
-            // Ordena por proximidade
-            trees.sort((a,b) => a.dist - b.dist).forEach(t => {
-                const li = document.createElement('li');
-                li.className = 'tree-item';
-                li.innerHTML = `<b>${t.name}</b> <span id="list-dist-${t.id}">Calc...</span>`;
-                li.onclick = () => selectTarget(t.id);
-                list.appendChild(li);
-            });
-        }
 
-        function selectTarget(id) {
-            if(currentTarget) {
-                currentTarget.el.querySelector('a-cone').setAttribute('color', '#2ecc71');
-                currentTarget.radarDot.classList.remove('target');
-            }
-            currentTarget = trees.find(t => t.id === id);
-            currentTarget.el.querySelector('a-cone').setAttribute('color', '#e74c3c'); // Vermelho
-            currentTarget.radarDot.classList.add('target');
-            
-            document.getElementById('nav-card').style.display = 'block';
-            document.getElementById('hud-name').innerText = currentTarget.name;
-            document.getElementById('sidebar').classList.remove('open');
-        }
+            // Ordena por distância
+            points.forEach(p => p.dist = haversine(userLat, userLon, p.lat, p.lon));
+            points.sort((a, b) => a.dist - b.dist);
 
-        function stopNav() {
-            if(currentTarget) {
-                currentTarget.el.querySelector('a-cone').setAttribute('color', '#2ecc71');
-                currentTarget.radarDot.classList.remove('target');
-            }
-            currentTarget = null;
-            document.getElementById('nav-card').style.display = 'none';
-            document.getElementById('arrow-left').style.display = 'none';
-            document.getElementById('arrow-right').style.display = 'none';
-        }
-
-        // 4. Matemática e Loops
-        function updateDistances() {
-            if(!userLat || !userLon) return;
-            trees.forEach(t => {
-                t.dist = haversine(userLat, userLon, t.lat, t.lon);
-                
-                // Texto 3D
-                const textEl = t.el.querySelector('a-text');
-                if(textEl) textEl.setAttribute('value', `${t.name}\n${t.dist.toFixed(0)}m`);
-
-                // Texto Lista
-                const listSpan = document.getElementById(`list-dist-${t.id}`);
-                if(listSpan) listSpan.innerText = t.dist.toFixed(0) + "m";
-
-                // Escala e Visibilidade
-                const model = t.el.querySelector('.visual-model');
+            points.forEach(p => {
+                // 1. Escala Dinâmica: Quanto mais longe, maior o objeto para ser visível
+                const model = p.el.querySelector('.marker-visual');
                 if(model) {
-                    // Lógica de escala para não ficar minúsculo longe
-                    let scale = Math.max(3, t.dist / 10);
-                    model.setAttribute('scale', `${scale} ${scale} ${scale}`);
+                    // Se < 20m, escala 1. Se 500m, escala 30.
+                    let scaleFactor = Math.max(1, p.dist / 15); 
+                    model.setAttribute('scale', `${scaleFactor} ${scaleFactor} ${scaleFactor}`);
                 }
-                t.el.setAttribute('visible', t.dist < 10000);
+                
+                // 2. Atualiza Texto Distância
+                const txt = p.el.querySelector('a-text');
+                if(txt) txt.setAttribute('value', `${p.name}\n${Math.round(p.dist)}m`);
+
+                // 3. Visibilidade (Filtro 500m)
+                const isVisible = p.dist <= VISIBILITY_RADIUS;
+                p.el.setAttribute('visible', isVisible);
+
+                // 4. Adiciona na lista se < 500m
+                if(isVisible) {
+                    const li = document.createElement('li');
+                    li.className = 'list-item';
+                    const badge = p.dist < 50 ? '<span class="near-badge">PERTO</span>' : '<span class="far-badge">LONGE</span>';
+                    li.innerHTML = `<b>${p.name}</b><br><small>${Math.round(p.dist)}m ${badge}</small>`;
+                    li.onclick = () => setTarget(p.id);
+                    list.appendChild(li);
+                }
             });
 
-            if(currentTarget) document.getElementById('hud-dist').innerText = currentTarget.dist.toFixed(0) + "m";
+            if(currentTarget) {
+                document.getElementById('hud-dist').innerText = Math.round(currentTarget.dist) + "m";
+            }
         }
 
         function updateVisuals() {
-            if(!userLat || !userLon) return;
-            
-            const arrL = document.getElementById('arrow-left');
-            const arrR = document.getElementById('arrow-right');
-            arrL.style.display = 'none';
-            arrR.style.display = 'none';
+            if(!userLat) return;
 
-            trees.forEach(t => {
-                if(!t.radarDot) return;
-                
-                // Radar
-                const bearing = computeBearing(userLat, userLon, t.lat, t.lon);
-                let relAngle = bearing - userHeading;
-                // Normaliza -180 a 180
-                while(relAngle < -180) relAngle += 360;
-                while(relAngle > 180) relAngle -= 360;
-
-                // Raio fixo para direção clara (40%)
-                const r = 40; 
-                const rad = relAngle * (Math.PI / 180);
-                const x = 50 + (r * Math.sin(rad)); 
-                const y = 50 - (r * Math.cos(rad)); // -cos pq topo é 0
-
-                t.radarDot.style.left = x + '%';
-                t.radarDot.style.top = y + '%';
-                t.radarDot.style.display = (t === currentTarget || t.dist < 200) ? 'block' : 'none';
-
-                // Setas (Só alvo)
-                if(currentTarget && t.id === currentTarget.id) {
-                    if(relAngle > 35) arrR.style.display = 'flex';
-                    else if(relAngle < -35) arrL.style.display = 'flex';
+            // Atualiza Radar
+            points.forEach(p => {
+                if(p.dist > VISIBILITY_RADIUS) {
+                    p.dot.style.display = 'none';
+                    return;
                 }
+                p.dot.style.display = 'block';
+
+                const bearing = getBearing(userLat, userLon, p.lat, p.lon);
+                let angle = bearing - userHeading;
+                // Normalizar -180 a 180
+                while(angle < -180) angle += 360;
+                while(angle > 180) angle -= 360;
+
+                // Radar UI
+                const r = 40; // Raio fixo no radar
+                const rad = angle * (Math.PI / 180);
+                const x = 50 + (r * Math.sin(rad));
+                const y = 50 - (r * Math.cos(rad));
+                
+                p.dot.style.left = x + '%';
+                p.dot.style.top = y + '%';
             });
+
+            // LINHA GUIA (A Corda)
+            const lineEl = document.getElementById('guide-line');
+            if(currentTarget && currentTarget.el.object3D.visible) {
+                // Pega a posição do objeto alvo em relação à câmera (mundo 3D local)
+                const pos = currentTarget.el.getAttribute('position');
+                
+                // Se o objeto já foi posicionado pelo AR.js
+                if(pos) {
+                    lineEl.setAttribute('visible', 'true');
+                    // Começa um pouco abaixo da tela (-1) e vai até o objeto
+                    // Usamos setAttribute para forçar atualização visual da linha
+                    lineEl.setAttribute('line', {
+                        start: {x: 0, y: -1, z: 0},
+                        end: {x: pos.x, y: pos.y, z: pos.z},
+                        color: 'yellow',
+                        opacity: 0.8
+                    });
+                }
+            } else {
+                lineEl.setAttribute('visible', 'false');
+            }
         }
 
-        // Helpers Matemáticos
+        // 4. CONTROLES
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function setTarget(id) {
+            // Reset antigo
+            if(currentTarget) currentTarget.dot.classList.remove('target');
+            
+            currentTarget = points.find(p => p.id === id);
+            currentTarget.dot.classList.add('target');
+            
+            document.getElementById('nav-panel').style.display = 'block';
+            document.getElementById('hud-target').innerText = currentTarget.name;
+            toggleSidebar(); // Fecha menu
+        }
+
+        function stopNav() {
+            if(currentTarget) currentTarget.dot.classList.remove('target');
+            currentTarget = null;
+            document.getElementById('nav-panel').style.display = 'none';
+            document.getElementById('guide-line').setAttribute('visible', 'false');
+        }
+
+        // 5. MATEMÁTICA
         function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371000; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const R = 6371000;
+            const dLat = (lat2-lat1)*Math.PI/180;
+            const dLon = (lon2-lon1)*Math.PI/180;
             const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function computeBearing(startLat, startLng, destLat, destLng) {
+        function getBearing(startLat, startLng, destLat, destLng) {
             const y = Math.sin(destLng*Math.PI/180 - startLng*Math.PI/180) * Math.cos(destLat*Math.PI/180);
             const x = Math.cos(startLat*Math.PI/180)*Math.sin(destLat*Math.PI/180) - Math.sin(startLat*Math.PI/180)*Math.cos(destLat*Math.PI/180)*Math.cos(destLng*Math.PI/180 - startLng*Math.PI/180);
             return (Math.atan2(y, x)*180/Math.PI + 360) % 360;
         }
+
     </script>
 </body>
 </html>
